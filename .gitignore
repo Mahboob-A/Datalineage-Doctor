@@ -63,3 +63,4 @@ Thumbs.db
 # Others
 knowledge/
 docker-compose-official-mysql-compose-file.yml
+AGENTS.md
