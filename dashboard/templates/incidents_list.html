@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Incidents</h2>
+{% if incidents %}
+<table>
+  <thead>
+    <tr>
+      <th>Table FQN</th>
+      <th>Triggered At</th>
+      <th>Status</th>
+      <th>Confidence</th>
+      <th>Blast Radius</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for incident in incidents %}
+    <tr>
+      <td>{{ incident.table_fqn }}</td>
+      <td>{{ incident.triggered_at }}</td>
+      <td><span class="badge status-{{ incident.status.value.lower() }}">{{ incident.status.value }}</span></td>
+      <td><span class="badge confidence-{{ incident.confidence_label.value.lower() }}">{{ incident.confidence_label.value }}</span></td>
+      <td>{{ incident.blast_radius_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No incidents yet. Trigger a webhook to populate the dashboard.</p>
+{% endif %}
+{% endblock %}
