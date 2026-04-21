@@ -74,7 +74,9 @@ def _parse_lineage_nodes(
     depth: int,
 ) -> list[LineageNode]:
     raw_nodes = raw.get("nodes", [])
-    raw_edges = raw.get("edges", [])
+    raw_edges = raw.get("edges")
+    if not isinstance(raw_edges, list):
+        raw_edges = raw.get(f"{direction}Edges", [])
     if not isinstance(raw_nodes, list) or not isinstance(raw_edges, list):
         return []
 

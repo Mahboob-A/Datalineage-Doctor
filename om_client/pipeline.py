@@ -79,6 +79,7 @@ async def get_pipeline_status(pipeline_fqn: str) -> PipelineStatus | dict[str, b
         last_run_status=_normalize_run_status(
             latest.get("runStatus")
             or latest.get("status")
+            or latest.get("executionStatus")
             or latest.get("pipelineState")
         ),
         last_run_at=_parse_timestamp(

@@ -34,3 +34,21 @@ async def test_get_dq_test_results_error(monkeypatch):
     monkeypatch.setattr("agent.tools.quality.om_get_dq_test_results", _raiser)
     result = await get_dq_test_results(table_fqn="mysql.default.raw_orders")
     assert result["tool"] == "get_dq_test_results"
+
+
+@pytest.mark.asyncio
+async def test_get_dq_test_results_accepts_string_limit(monkeypatch):
+    captured_limit: list[int] = []
+
+    async def _mock(table_fqn: str, limit: int):
+        _ = table_fqn
+        captured_limit.append(limit)
+        return []
+
+    monkeypatch.setattr("agent.tools.quality.om_get_dq_test_results", _mock)
+    result = await get_dq_test_results(
+        table_fqn="mysql.default.raw_orders",
+        limit="10",  # type: ignore[arg-type]
+    )
+    assert result["test_results"] == []
+    assert captured_limit == [10]

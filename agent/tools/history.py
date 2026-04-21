@@ -16,7 +16,12 @@ async def find_past_incidents(
     if db_session is None:
         return {"past_incidents": [], "count": 0}
 
-    bounded_limit = max(1, min(limit, 20))
+    try:
+        normalized_limit = int(limit)
+    except (TypeError, ValueError):
+        normalized_limit = 5
+
+    bounded_limit = max(1, min(normalized_limit, 20))
     try:
         result = await db_session.execute(
             select(Incident)

@@ -15,7 +15,13 @@ async def get_upstream_lineage(
     """Return normalized upstream lineage nodes for a table FQN."""
     _ = db_session
     try:
-        nodes = await om_get_upstream_lineage(table_fqn=table_fqn, depth=depth)
+        normalized_depth = int(depth)
+    except (TypeError, ValueError):
+        normalized_depth = 3
+    try:
+        nodes = await om_get_upstream_lineage(
+            table_fqn=table_fqn, depth=normalized_depth
+        )
         return {
             "upstream_nodes": [
                 {
@@ -42,7 +48,13 @@ async def calculate_blast_radius(
     """Return downstream impacted consumers and total affected count."""
     _ = db_session
     try:
-        nodes = await om_get_downstream_lineage(table_fqn=table_fqn, depth=depth)
+        normalized_depth = int(depth)
+    except (TypeError, ValueError):
+        normalized_depth = 3
+    try:
+        nodes = await om_get_downstream_lineage(
+            table_fqn=table_fqn, depth=normalized_depth
+        )
         blast_radius = sorted(
             [
                 {

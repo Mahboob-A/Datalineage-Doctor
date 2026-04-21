@@ -30,8 +30,19 @@ from app.models import ConfidenceLabel, ToolCallLog
 logger = structlog.get_logger(__name__)
 
 CORRECTION_PROMPT = (
-    "Return only valid JSON that matches the RCAReport schema. "
-    "Do not include markdown code fences or explanatory text."
+    "Your previous output failed schema validation. "
+    "Return ONLY valid JSON (no markdown, no prose) with all required fields: "
+    "root_cause_summary, confidence_score, confidence_label, evidence_chain, "
+    "remediation_steps, timeline_events, blast_radius_consumers, "
+    "upstream_nodes_checked, tool_calls_made, agent_iterations. "
+    "Use ISO-8601 for timeline_events[].occurred_at."
+)
+
+TOOL_COLLECTION_PROMPT = (
+    "Before returning the final JSON report, you must gather evidence via tool calls. "
+    "Call tools first for lineage, blast radius, DQ results, pipeline status, and "
+    "ownership/history where relevant. "
+    "After tool results are available, return strict JSON only."
 )
 
 
@@ -218,6 +229,7 @@ async def run_rca_agent(
     iteration = 0
     tool_calls_made = 0
     correction_sent = False
+    tool_collection_prompt_sent = False
     rate_limit_retries = 0
 
     while iteration < settings.llm_max_iterations:
@@ -308,6 +320,11 @@ async def run_rca_agent(
                     iteration=iteration,
                     error=str(exc),
                 )
+                if tool_calls_made == 0 and not tool_collection_prompt_sent:
+                    tool_collection_prompt_sent = True
+                    messages.append({"role": "user", "content": TOOL_COLLECTION_PROMPT})
+                    iteration += 1
+                    continue
                 if correction_sent:
                     return _build_fallback_report(
                         table_fqn=table_fqn,

@@ -66,3 +66,24 @@ async def test_find_past_incidents_success():
 
     assert result["count"] == 2
     assert result["past_incidents"][0]["confidence_label"] == "HIGH"
+
+
+@pytest.mark.asyncio
+async def test_find_past_incidents_string_limit_is_handled():
+    rows = [
+        SimpleNamespace(
+            id=uuid4(),
+            triggered_at=datetime(2026, 4, 20, 10, 0, tzinfo=UTC),
+            root_cause_summary="Pipeline failed",
+            confidence_label=ConfidenceLabel.HIGH,
+        )
+    ]
+    session = _FakeSession(rows)
+
+    result = await find_past_incidents(
+        table_fqn="mysql.default.raw_orders",
+        limit="5",
+        db_session=session,
+    )
+
+    assert result["count"] == 1

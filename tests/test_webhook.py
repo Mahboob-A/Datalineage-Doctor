@@ -19,13 +19,33 @@ def test_webhook_queued(client, monkeypatch):
     class _Task:
         id = "task-123"
 
+    class _Counter:
+        def inc(self):
+            return None
+
+    class _Metric:
+        def labels(self, **kwargs):
+            _ = kwargs
+            return _Counter()
+
     monkeypatch.setattr("app.routers.webhook.rca_task.delay", lambda **_: _Task())
+    monkeypatch.setattr("app.routers.webhook.rca_requests_total", _Metric())
     response = client.post("/webhook/openmetadata", json=_valid_payload())
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
 
 
-def test_webhook_ignored(client):
+def test_webhook_ignored(client, monkeypatch):
+    class _Counter:
+        def inc(self):
+            return None
+
+    class _Metric:
+        def labels(self, **kwargs):
+            _ = kwargs
+            return _Counter()
+
+    monkeypatch.setattr("app.routers.webhook.rca_requests_total", _Metric())
     payload = _valid_payload()
     payload["eventType"] = "tableUpdated"
     response = client.post("/webhook/openmetadata", json=payload)

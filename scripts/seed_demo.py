@@ -1,22 +1,34 @@
 import asyncio
+import importlib
+import os
+import socket
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
 import structlog
 
-from om_client.client import OMClient
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+
+def _default_om_base_url() -> str:
+    try:
+        socket.gethostbyname("openmetadata_server")
+    except OSError:
+        return "http://localhost:8585/api/v1"
+    return "http://openmetadata_server:8585/api/v1"
+
+
+os.environ.setdefault("OM_BASE_URL", _default_om_base_url())
+
+OMClient = importlib.import_module("om_client.client").OMClient
 
 logger = structlog.get_logger(__name__)
 
-
-def _to_om_table_fqn(table_fqn: str) -> str:
-    """Normalize legacy 3-part table FQNs to OM's 4-part format."""
-    parts = table_fqn.split(".")
-    if len(parts) == 3:
-        service, database, table = parts
-        return f"{service}.{database}.default.{table}"
-    return table_fqn
-
+PIPELINE_FQN = "airflow.ingest_orders_daily"
+PIPELINE_FAILED_AT_MS = int(datetime(2026, 4, 20, 3, 0, tzinfo=UTC).timestamp() * 1000)
 
 TABLES = {
     "mysql.default.raw_orders": [
@@ -47,40 +59,90 @@ TABLES = {
     ],
 }
 
+DASHBOARDS = {
+    "metabase.revenue_dashboard": {
+        "name": "revenue_dashboard",
+        "service": "metabase",
+        "description": "Revenue trends powered by fct_orders and fct_revenue.",
+    }
+}
+
 LINEAGE_EDGES = [
-    ("mysql.default.raw_orders", "dbt.default.stg_orders"),
-    ("mysql.default.raw_products", "dbt.default.stg_products"),
-    ("dbt.default.stg_orders", "dbt.default.fct_orders"),
-    ("dbt.default.stg_products", "dbt.default.fct_revenue"),
-    ("dbt.default.fct_orders", "dbt.default.fct_revenue"),
+    ("pipeline", "airflow.ingest_orders_daily", "table", "mysql.default.raw_orders"),
+    ("table", "mysql.default.raw_orders", "table", "dbt.default.stg_orders"),
+    ("table", "mysql.default.raw_products", "table", "dbt.default.stg_products"),
+    ("table", "dbt.default.stg_orders", "table", "dbt.default.fct_orders"),
+    ("table", "dbt.default.stg_products", "table", "dbt.default.fct_revenue"),
+    ("table", "dbt.default.fct_orders", "table", "dbt.default.fct_revenue"),
+    ("table", "dbt.default.fct_orders", "dashboard", "metabase.revenue_dashboard"),
 ]
 
 TEST_CASES = [
     {
-        "fqn": "mysql.default.raw_orders.null_check_order_id",
         "name": "null_check_order_id",
-        "entity_link": "<#E::table::mysql.default.raw_orders>",
+        "table_fqn": "mysql.default.raw_orders",
         "test_definition": "columnValuesToBeNotNull",
     },
     {
-        "fqn": "mysql.default.raw_orders.row_count_orders",
         "name": "row_count_orders",
-        "entity_link": "<#E::table::mysql.default.raw_orders>",
+        "table_fqn": "mysql.default.raw_orders",
         "test_definition": "tableRowCountToBeBetween",
     },
     {
-        "fqn": "dbt.default.fct_orders.unique_order_id",
         "name": "unique_order_id",
-        "entity_link": "<#E::table::dbt.default.fct_orders>",
+        "table_fqn": "dbt.default.fct_orders",
         "test_definition": "columnValuesToBeUnique",
     },
     {
-        "fqn": "dbt.default.fct_revenue.freshness_check",
         "name": "freshness_check",
-        "entity_link": "<#E::table::dbt.default.fct_revenue>",
+        "table_fqn": "dbt.default.fct_revenue",
         "test_definition": "tableLastModifiedTimeToBeBetween",
     },
 ]
+
+CUSTOM_TEST_DEFINITIONS = {
+    "tableLastModifiedTimeToBeBetween": {
+        "description": "Validate table freshness by checking last modified time.",
+        "entityType": "TABLE",
+        "testPlatforms": ["OpenMetadata"],
+    }
+}
+
+
+def _to_om_table_fqn(table_fqn: str) -> str:
+    parts = table_fqn.split(".")
+    if len(parts) == 3:
+        service, database, table = parts
+        return f"{service}.{database}.default.{table}"
+    return table_fqn
+
+
+def _table_fqn_candidates(table_fqn: str) -> list[str]:
+    normalized = _to_om_table_fqn(table_fqn)
+    if normalized == table_fqn:
+        return [table_fqn]
+    return [normalized, table_fqn]
+
+
+def _test_case_fqn_candidates(table_fqn: str, name: str) -> list[str]:
+    candidates = []
+    for candidate in _table_fqn_candidates(table_fqn):
+        candidates.append(f"{candidate}.{name}")
+    unique: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+    return unique
+
+
+async def _put_json(om: OMClient, path: str, payload: dict[str, object]) -> httpx.Response:
+    assert om.client is not None
+    response = await om.client.put(path, json=payload)
+    response.raise_for_status()
+    return response
 
 
 async def _ensure_entity(
@@ -122,9 +184,166 @@ async def _ensure_entity(
         )
         return {}
 
+    if created.get("found") is False:
+        summary["failed"] += 1
+        logger.warning("seed_entity_create_not_found", kind=kind, path=create_path)
+        return {}
+
     summary["created"] += 1
     logger.info("seed_entity_created", kind=kind, path=create_path)
     return created
+
+
+async def _lookup_table(om: OMClient, table_fqn: str) -> dict[str, object]:
+    response = {"found": False}
+    for candidate in _table_fqn_candidates(table_fqn):
+        response = await om._get(f"/tables/name/{quote(candidate, safe='')}")
+        if response.get("found", True):
+            break
+    return response
+
+
+async def _lookup_test_case(om: OMClient, table_fqn: str, name: str) -> dict[str, object]:
+    response = {"found": False}
+    for candidate in _test_case_fqn_candidates(table_fqn, name):
+        response = await om._get(f"/dataQuality/testCases/name/{quote(candidate, safe='')}")
+        if response.get("found", True):
+            break
+    return response
+
+
+async def _lookup_dashboard(om: OMClient, dashboard_fqn: str) -> dict[str, object]:
+    return await om._get(f"/dashboards/name/{quote(dashboard_fqn, safe='')}")
+
+
+async def _lookup_pipeline(om: OMClient, pipeline_fqn: str) -> dict[str, object]:
+    return await om._get(f"/pipelines/name/{quote(pipeline_fqn, safe='')}")
+
+
+async def _ensure_test_definition(
+    om: OMClient,
+    *,
+    test_definition: str,
+    summary: dict[str, int],
+) -> bool:
+    try:
+        existing = await om._get(
+            f"/dataQuality/testDefinitions/name/{quote(test_definition, safe='')}"
+        )
+    except httpx.HTTPError as exc:
+        summary["failed"] += 1
+        logger.warning(
+            "seed_test_definition_lookup_failed",
+            test_definition=test_definition,
+            error=str(exc),
+        )
+        return False
+
+    if existing.get("found", True):
+        summary["existing"] += 1
+        logger.info("seed_test_definition_exists", test_definition=test_definition)
+        return True
+
+    custom_definition = CUSTOM_TEST_DEFINITIONS.get(test_definition)
+    if custom_definition is None:
+        summary["failed"] += 1
+        logger.warning(
+            "seed_test_definition_missing",
+            test_definition=test_definition,
+            error="Definition not found and no custom bootstrap payload configured",
+        )
+        return False
+
+    payload = {"name": test_definition, **custom_definition}
+    try:
+        created = await om._post("/dataQuality/testDefinitions", payload=payload)
+    except httpx.HTTPStatusError as exc:
+        if exc.response is not None and exc.response.status_code == 409:
+            summary["existing"] += 1
+            logger.info("seed_test_definition_exists", test_definition=test_definition)
+            return True
+        summary["failed"] += 1
+        logger.warning(
+            "seed_test_definition_create_failed",
+            test_definition=test_definition,
+            status_code=exc.response.status_code if exc.response is not None else None,
+            error=str(exc),
+        )
+        return False
+
+    if created.get("found") is False:
+        summary["failed"] += 1
+        logger.warning("seed_test_definition_create_not_found", test_definition=test_definition)
+        return False
+
+    summary["created"] += 1
+    logger.info("seed_test_definition_created", test_definition=test_definition)
+    return True
+
+
+async def _ensure_executable_test_suite(
+    om: OMClient,
+    *,
+    table_fqn: str,
+    summary: dict[str, int],
+) -> str | None:
+    normalized_table_fqn = _to_om_table_fqn(table_fqn)
+    suite_fqn = f"{normalized_table_fqn}.testSuite"
+    try:
+        existing_suite = await om._get(
+            f"/dataQuality/testSuites/name/{quote(suite_fqn, safe='')}"
+        )
+    except httpx.HTTPError as exc:
+        summary["failed"] += 1
+        logger.warning(
+            "seed_test_suite_lookup_failed",
+            table_fqn=table_fqn,
+            suite_fqn=suite_fqn,
+            error=str(exc),
+        )
+        return None
+
+    if existing_suite.get("found", True):
+        summary["existing"] += 1
+        logger.info("seed_test_suite_exists", table_fqn=table_fqn, suite_fqn=suite_fqn)
+        return str(existing_suite.get("fullyQualifiedName") or suite_fqn)
+
+    table_name = normalized_table_fqn.split(".")[-1]
+    payload = {
+        "name": f"{table_name}_test_suite",
+        "displayName": f"{table_name}_test_suite",
+        "executableEntityReference": normalized_table_fqn,
+    }
+    try:
+        created_suite = await om._post("/dataQuality/testSuites/executable", payload=payload)
+    except httpx.HTTPStatusError as exc:
+        if exc.response is not None and exc.response.status_code == 409:
+            summary["existing"] += 1
+            logger.info("seed_test_suite_exists", table_fqn=table_fqn, suite_fqn=suite_fqn)
+            return suite_fqn
+        summary["failed"] += 1
+        logger.warning(
+            "seed_test_suite_failed",
+            table_fqn=table_fqn,
+            suite_fqn=suite_fqn,
+            status_code=exc.response.status_code if exc.response is not None else None,
+            error=str(exc),
+        )
+        return None
+
+    if created_suite.get("found") is False:
+        summary["failed"] += 1
+        logger.warning("seed_test_suite_create_not_found", table_fqn=table_fqn)
+        return None
+
+    summary["created"] += 1
+    created_fqn = str(created_suite.get("fullyQualifiedName") or suite_fqn)
+    logger.info(
+        "seed_test_suite_created",
+        table_fqn=table_fqn,
+        suite_fqn=created_fqn,
+    )
+    return created_fqn
 
 
 async def _ensure_services(om: OMClient, summary: dict[str, int]) -> None:
@@ -182,42 +401,34 @@ async def _ensure_databases_and_schemas(om: OMClient, summary: dict[str, int]) -
     for service_name in ("mysql", "dbt"):
         database_fqn = f"{service_name}.default"
         schema_fqn = f"{database_fqn}.default"
-
         await _ensure_entity(
             om,
             kind="database",
             get_path=f"/databases/name/{quote(database_fqn, safe='')}",
             create_path="/databases",
-            payload={
-                "name": "default",
-                "service": service_name,
-            },
+            payload={"name": "default", "service": service_name},
             summary=summary,
         )
-
         await _ensure_entity(
             om,
             kind="database_schema",
             get_path=f"/databaseSchemas/name/{quote(schema_fqn, safe='')}",
             create_path="/databaseSchemas",
-            payload={
-                "name": "default",
-                "database": database_fqn,
-            },
+            payload={"name": "default", "database": database_fqn},
             summary=summary,
         )
 
 
 async def _ensure_tables(om: OMClient, summary: dict[str, int]) -> None:
-    for legacy_fqn, columns in TABLES.items():
-        table_fqn = _to_om_table_fqn(legacy_fqn)
-        parts = table_fqn.split(".")
+    for table_fqn, columns in TABLES.items():
+        normalized = _to_om_table_fqn(table_fqn)
+        parts = normalized.split(".")
         table_name = parts[-1]
         database_schema = ".".join(parts[:3])
         await _ensure_entity(
             om,
             kind="table",
-            get_path=f"/tables/name/{quote(table_fqn, safe='')}",
+            get_path=f"/tables/name/{quote(normalized, safe='')}",
             create_path="/tables",
             payload={
                 "name": table_name,
@@ -228,134 +439,277 @@ async def _ensure_tables(om: OMClient, summary: dict[str, int]) -> None:
         )
 
 
-async def _get_table_id(om: OMClient, table_fqn: str) -> str | None:
-    normalized_fqn = _to_om_table_fqn(table_fqn)
-    try:
-        table = await om._get(f"/tables/name/{quote(normalized_fqn, safe='')}")
-    except httpx.HTTPError as exc:
-        logger.warning(
-            "seed_table_lookup_failed",
-            table_fqn=table_fqn,
-            normalized_fqn=normalized_fqn,
-            error=str(exc),
-        )
-        return None
-    table_id = table.get("id")
-    return str(table_id) if table_id else None
-
-
-async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
-    for upstream_fqn, downstream_fqn in LINEAGE_EDGES:
-        upstream_id = await _get_table_id(om, upstream_fqn)
-        downstream_id = await _get_table_id(om, downstream_fqn)
-        if upstream_id is None or downstream_id is None:
-            summary["failed"] += 1
-            logger.warning(
-                "seed_lineage_skipped_missing_table",
-                upstream_fqn=upstream_fqn,
-                downstream_fqn=downstream_fqn,
-            )
-            continue
-
-        try:
-            assert om.client is not None
-            response = await om.client.put(
-                "/lineage",
-                json={
-                    "edge": {
-                        "fromEntity": {"id": upstream_id, "type": "table"},
-                        "toEntity": {"id": downstream_id, "type": "table"},
-                    }
-                },
-            )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            if exc.response is not None and exc.response.status_code in {400, 409}:
-                summary["existing"] += 1
-                logger.info(
-                    "seed_lineage_exists",
-                    upstream_fqn=upstream_fqn,
-                    downstream_fqn=downstream_fqn,
-                )
-                continue
-            summary["failed"] += 1
-            logger.warning(
-                "seed_lineage_failed",
-                upstream_fqn=upstream_fqn,
-                downstream_fqn=downstream_fqn,
-                status_code=(
-                    exc.response.status_code if exc.response is not None else None
-                ),
-                error=str(exc),
-            )
-            continue
-
-        summary["created"] += 1
-        logger.info(
-            "seed_lineage_created",
-            upstream_fqn=upstream_fqn,
-            downstream_fqn=downstream_fqn,
+async def _ensure_dashboards(om: OMClient, summary: dict[str, int]) -> None:
+    for dashboard_fqn, config in DASHBOARDS.items():
+        await _ensure_entity(
+            om,
+            kind="dashboard",
+            get_path=f"/dashboards/name/{quote(dashboard_fqn, safe='')}",
+            create_path="/dashboards",
+            payload={
+                "name": str(config["name"]),
+                "service": str(config["service"]),
+                "description": str(config["description"]),
+            },
+            summary=summary,
         )
 
 
-async def _ensure_pipeline_status(om: OMClient, summary: dict[str, int]) -> None:
-    pipeline_fqn = "airflow.ingest_orders_daily"
-    get_path = f"/pipelines/name/{quote(pipeline_fqn, safe='')}"
+async def _ensure_pipeline(om: OMClient, summary: dict[str, int]) -> None:
+    get_path = f"/pipelines/name/{quote(PIPELINE_FQN, safe='')}?fields=tasks"
+    payload = {
+        "name": "ingest_orders_daily",
+        "service": "airflow",
+        "tasks": [{"name": "extract_orders"}, {"name": "load_orders"}],
+    }
     try:
         existing = await om._get(get_path)
     except httpx.HTTPError as exc:
         summary["failed"] += 1
-        logger.warning(
-            "seed_pipeline_lookup_failed", pipeline_fqn=pipeline_fqn, error=str(exc)
-        )
+        logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=PIPELINE_FQN, error=str(exc))
         return
-    if existing.get("found", True):
+
+    has_tasks = isinstance(existing.get("tasks"), list) and len(existing["tasks"]) > 0
+    if existing.get("found", True) and has_tasks:
         summary["existing"] += 1
-        logger.info("seed_pipeline_exists", pipeline_fqn=pipeline_fqn)
+        logger.info("seed_pipeline_exists", pipeline_fqn=PIPELINE_FQN)
         return
 
     try:
-        await om._post(
-            "/pipelines",
-            payload={
-                "name": "ingest_orders_daily",
-                "service": "airflow",
-            },
-        )
+        response = await _put_json(om, "/pipelines", payload)
+        body = response.json()
     except httpx.HTTPStatusError as exc:
         summary["failed"] += 1
         logger.warning(
-            "seed_pipeline_failed",
-            pipeline_fqn=pipeline_fqn,
+            "seed_pipeline_upsert_failed",
+            pipeline_fqn=PIPELINE_FQN,
             status_code=exc.response.status_code if exc.response is not None else None,
             error=str(exc),
         )
         return
 
+    if isinstance(body, dict) and body.get("found") is False:
+        summary["failed"] += 1
+        logger.warning("seed_pipeline_upsert_not_found", pipeline_fqn=PIPELINE_FQN)
+        return
+
     summary["created"] += 1
-    logger.info("seed_pipeline_created", pipeline_fqn=pipeline_fqn)
+    logger.info("seed_pipeline_upserted", pipeline_fqn=PIPELINE_FQN)
+
+
+async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
+    for from_type, from_fqn, to_type, to_fqn in LINEAGE_EDGES:
+        try:
+            if from_type == "table":
+                from_entity = await _lookup_table(om, from_fqn)
+            elif from_type == "pipeline":
+                from_entity = await _lookup_pipeline(om, from_fqn)
+            else:
+                from_entity = await _lookup_dashboard(om, from_fqn)
+
+            if to_type == "table":
+                to_entity = await _lookup_table(om, to_fqn)
+            elif to_type == "pipeline":
+                to_entity = await _lookup_pipeline(om, to_fqn)
+            else:
+                to_entity = await _lookup_dashboard(om, to_fqn)
+        except httpx.HTTPError as exc:
+            summary["failed"] += 1
+            logger.warning(
+                "seed_lineage_lookup_failed",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+                error=str(exc),
+            )
+            continue
+
+        from_id = from_entity.get("id")
+        to_id = to_entity.get("id")
+        if not from_id or not to_id:
+            summary["failed"] += 1
+            logger.warning(
+                "seed_lineage_skipped_missing_entity",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+            )
+            continue
+
+        try:
+            await _put_json(
+                om,
+                "/lineage",
+                {
+                    "edge": {
+                        "fromEntity": {"id": str(from_id), "type": from_type},
+                        "toEntity": {"id": str(to_id), "type": to_type},
+                    }
+                },
+            )
+            summary["created"] += 1
+            logger.info(
+                "seed_lineage_created",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code in {400, 409}:
+                summary["existing"] += 1
+                logger.info(
+                    "seed_lineage_exists",
+                    from_type=from_type,
+                    from_fqn=from_fqn,
+                    to_type=to_type,
+                    to_fqn=to_fqn,
+                )
+                continue
+            summary["failed"] += 1
+            logger.warning(
+                "seed_lineage_failed",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+                status_code=exc.response.status_code if exc.response is not None else None,
+                error=str(exc),
+            )
+
+
+async def _ensure_pipeline_status(om: OMClient, summary: dict[str, int]) -> None:
+    try:
+        pipeline = await _lookup_pipeline(om, PIPELINE_FQN)
+    except httpx.HTTPError as exc:
+        summary["failed"] += 1
+        logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=PIPELINE_FQN, error=str(exc))
+        return
+
+    if not pipeline.get("found", True):
+        summary["failed"] += 1
+        logger.warning("seed_pipeline_missing", pipeline_fqn=PIPELINE_FQN)
+        return
+
+    status_payload = {
+        "timestamp": PIPELINE_FAILED_AT_MS,
+        "executionStatus": "Failed",
+        "taskStatus": [
+            {"name": "extract_orders", "executionStatus": "Successful"},
+            {"name": "load_orders", "executionStatus": "Failed"},
+        ],
+    }
+    status_path = f"/pipelines/{quote(PIPELINE_FQN, safe='')}/status"
+
+    try:
+        await _put_json(om, status_path, status_payload)
+        summary["created"] += 1
+        logger.info(
+            "seed_pipeline_status_created",
+            pipeline_fqn=PIPELINE_FQN,
+            timestamp=PIPELINE_FAILED_AT_MS,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response is not None and exc.response.status_code == 409:
+            summary["existing"] += 1
+            logger.info(
+                "seed_pipeline_status_exists",
+                pipeline_fqn=PIPELINE_FQN,
+                timestamp=PIPELINE_FAILED_AT_MS,
+            )
+            return
+        summary["failed"] += 1
+        logger.warning(
+            "seed_pipeline_status_failed",
+            pipeline_fqn=PIPELINE_FQN,
+            status_code=exc.response.status_code if exc.response is not None else None,
+            error=str(exc),
+        )
 
 
 async def _ensure_test_cases(om: OMClient, summary: dict[str, int]) -> None:
-    _ = om
-    _ = summary
-    logger.info(
-        "seed_test_cases_skipped",
-        reason=(
-            "OpenMetadata requires executable test suites for test case creation; "
-            "skip bootstrap test cases in demo seed"
-        ),
-    )
+    for test_case in TEST_CASES:
+        name = str(test_case["name"])
+        table_fqn = str(test_case["table_fqn"])
+        test_definition = str(test_case["test_definition"])
+        has_definition = await _ensure_test_definition(
+            om, test_definition=test_definition, summary=summary
+        )
+        if not has_definition:
+            continue
+        suite_fqn = await _ensure_executable_test_suite(
+            om, table_fqn=table_fqn, summary=summary
+        )
+        if suite_fqn is None:
+            continue
+
+        try:
+            existing = await _lookup_test_case(om, table_fqn=table_fqn, name=name)
+        except httpx.HTTPError as exc:
+            summary["failed"] += 1
+            logger.warning(
+                "seed_test_case_lookup_failed",
+                name=name,
+                table_fqn=table_fqn,
+                error=str(exc),
+            )
+            continue
+
+        if existing.get("found", True):
+            summary["existing"] += 1
+            logger.info("seed_test_case_exists", name=name, table_fqn=table_fqn)
+            continue
+
+        entity_link = f"<#E::table::{_to_om_table_fqn(table_fqn)}>"
+        payload = {
+            "name": name,
+            "displayName": name,
+            "entityLink": entity_link,
+            "testDefinition": test_definition,
+            "testSuite": suite_fqn,
+            "computePassedFailedRowCount": False,
+            "useDynamicAssertion": False,
+        }
+        try:
+            created = await om._post("/dataQuality/testCases", payload=payload)
+            if created.get("found") is False:
+                summary["failed"] += 1
+                logger.warning(
+                    "seed_test_case_create_not_found",
+                    name=name,
+                    table_fqn=table_fqn,
+                    test_definition=test_definition,
+                )
+                continue
+            summary["created"] += 1
+            logger.info("seed_test_case_created", name=name, table_fqn=table_fqn)
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code == 409:
+                summary["existing"] += 1
+                logger.info("seed_test_case_exists", name=name, table_fqn=table_fqn)
+                continue
+            summary["failed"] += 1
+            logger.warning(
+                "seed_test_case_failed",
+                name=name,
+                table_fqn=table_fqn,
+                test_definition=test_definition,
+                status_code=exc.response.status_code if exc.response is not None else None,
+                error=str(exc),
+            )
 
 
 async def seed_demo_data() -> dict[str, int]:
-    """Seed OpenMetadata demo entities in an idempotent best-effort manner."""
     summary = {"created": 0, "existing": 0, "failed": 0}
     async with OMClient() as om:
         for step in (
             _ensure_services,
             _ensure_databases_and_schemas,
             _ensure_tables,
+            _ensure_dashboards,
+            _ensure_pipeline,
             _ensure_lineage,
             _ensure_pipeline_status,
             _ensure_test_cases,
@@ -371,3 +725,5 @@ async def seed_demo_data() -> dict[str, int]:
 if __name__ == "__main__":
     results = asyncio.run(seed_demo_data())
     logger.info("seed_demo_summary", **results)
+    if results["failed"] > 0:
+        raise SystemExit(1)

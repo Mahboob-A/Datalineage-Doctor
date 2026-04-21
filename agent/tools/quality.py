@@ -14,7 +14,13 @@ async def get_dq_test_results(
     """Return recent data quality test results for the provided table FQN."""
     _ = db_session
     try:
-        results = await om_get_dq_test_results(table_fqn=table_fqn, limit=limit)
+        normalized_limit = int(limit)
+    except (TypeError, ValueError):
+        normalized_limit = 5
+    try:
+        results = await om_get_dq_test_results(
+            table_fqn=table_fqn, limit=normalized_limit
+        )
         return {
             "test_results": [result.model_dump(mode="json") for result in results],
         }

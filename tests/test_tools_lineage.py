@@ -59,3 +59,22 @@ async def test_calculate_blast_radius_sorts_by_level(monkeypatch):
     result = await calculate_blast_radius(table_fqn="mysql.default.raw_orders", depth=3)
     assert result["total_affected"] == 2
     assert result["blast_radius"][0]["entity_fqn"] == "dbt.default.stg_orders"
+
+
+@pytest.mark.asyncio
+async def test_get_upstream_lineage_accepts_string_depth(monkeypatch):
+    captured_depth: list[int] = []
+
+    async def _mock(table_fqn: str, depth: int):
+        _ = table_fqn
+        captured_depth.append(depth)
+        return []
+
+    monkeypatch.setattr("agent.tools.lineage.om_get_upstream_lineage", _mock)
+
+    result = await get_upstream_lineage(
+        table_fqn="mysql.default.raw_orders",
+        depth="5",  # type: ignore[arg-type]
+    )
+    assert result["upstream_nodes"] == []
+    assert captured_depth == [5]
