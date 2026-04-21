@@ -220,6 +220,77 @@ async def _lookup_pipeline(om: OMClient, pipeline_fqn: str) -> dict[str, object]
     return await om._get(f"/pipelines/name/{quote(pipeline_fqn, safe='')}")
 
 
+def _extract_edge_node_id(edge: dict[str, object], key: str) -> str:
+    value = edge.get(key)
+    if isinstance(value, dict):
+        return str(value.get("id") or "")
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+async def _lookup_lineage_graph(
+    om: OMClient,
+    *,
+    entity_type: str,
+    entity_id: str,
+) -> dict[str, object]:
+    return await om._get(
+        f"/lineage/{entity_type}/{quote(entity_id, safe='')}",
+        params={"upstreamDepth": 3, "downstreamDepth": 3},
+    )
+
+
+def _lineage_edge_exists(
+    raw: dict[str, object],
+    *,
+    from_id: str,
+    to_id: str,
+) -> bool:
+    edge_groups = []
+    for key in ("edges", "upstreamEdges", "downstreamEdges"):
+        value = raw.get(key)
+        if isinstance(value, list):
+            edge_groups.extend(value)
+
+    for edge in edge_groups:
+        if not isinstance(edge, dict):
+            continue
+        if (
+            _extract_edge_node_id(edge, "fromEntity") == from_id
+            and _extract_edge_node_id(edge, "toEntity") == to_id
+        ):
+            return True
+    return False
+
+
+def _extract_latest_pipeline_status(raw_status: object) -> dict[str, object]:
+    if isinstance(raw_status, dict):
+        return raw_status
+    if isinstance(raw_status, list):
+        candidates = [item for item in raw_status if isinstance(item, dict)]
+        if not candidates:
+            return {}
+        return max(
+            candidates,
+            key=lambda item: int(item.get("timestamp") or 0),
+        )
+    return {}
+
+
+def _pipeline_status_matches(
+    latest_status: dict[str, object],
+    *,
+    timestamp: int,
+    execution_status: str,
+) -> bool:
+    if not latest_status:
+        return False
+    latest_timestamp = latest_status.get("timestamp")
+    latest_execution = latest_status.get("executionStatus")
+    return latest_timestamp == timestamp and latest_execution == execution_status
+
+
 async def _ensure_test_definition(
     om: OMClient,
     *,
@@ -539,6 +610,39 @@ async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
             continue
 
         try:
+            existing_lineage = await _lookup_lineage_graph(
+                om,
+                entity_type=from_type,
+                entity_id=str(from_id),
+            )
+        except httpx.HTTPError as exc:
+            summary["failed"] += 1
+            logger.warning(
+                "seed_lineage_lookup_failed",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+                error=str(exc),
+            )
+            continue
+
+        if _lineage_edge_exists(
+            existing_lineage,
+            from_id=str(from_id),
+            to_id=str(to_id),
+        ):
+            summary["existing"] += 1
+            logger.info(
+                "seed_lineage_exists",
+                from_type=from_type,
+                from_fqn=from_fqn,
+                to_type=to_type,
+                to_fqn=to_fqn,
+            )
+            continue
+
+        try:
             await _put_json(
                 om,
                 "/lineage",
@@ -582,7 +686,10 @@ async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
 
 async def _ensure_pipeline_status(om: OMClient, summary: dict[str, int]) -> None:
     try:
-        pipeline = await _lookup_pipeline(om, PIPELINE_FQN)
+        pipeline = await om._get(
+            f"/pipelines/name/{quote(PIPELINE_FQN, safe='')}",
+            params={"fields": "pipelineStatus"},
+        )
     except httpx.HTTPError as exc:
         summary["failed"] += 1
         logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=PIPELINE_FQN, error=str(exc))
@@ -602,6 +709,20 @@ async def _ensure_pipeline_status(om: OMClient, summary: dict[str, int]) -> None
         ],
     }
     status_path = f"/pipelines/{quote(PIPELINE_FQN, safe='')}/status"
+    latest_status = _extract_latest_pipeline_status(pipeline.get("pipelineStatus"))
+
+    if _pipeline_status_matches(
+        latest_status,
+        timestamp=PIPELINE_FAILED_AT_MS,
+        execution_status="Failed",
+    ):
+        summary["existing"] += 1
+        logger.info(
+            "seed_pipeline_status_exists",
+            pipeline_fqn=PIPELINE_FQN,
+            timestamp=PIPELINE_FAILED_AT_MS,
+        )
+        return
 
     try:
         await _put_json(om, status_path, status_payload)

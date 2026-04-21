@@ -206,3 +206,86 @@ async def test_run_rca_agent_passes_incident_id_to_tool_log(monkeypatch):
 
     assert report.tool_calls_made == 1
     assert captured_incident_ids == [expected_incident_id]
+
+
+@pytest.mark.asyncio
+async def test_run_rca_agent_recovers_from_truncated_response(monkeypatch):
+    call_sequence = [
+        SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    finish_reason="length",
+                    message=SimpleNamespace(
+                        content="{" + ("x" * 5000),
+                        tool_calls=[],
+                    ),
+                )
+            ]
+        ),
+        _stop_response(_report_content(confidence_score=0.9, confidence_label="LOW")),
+    ]
+    captured_messages: list[list[dict[str, object]]] = []
+
+    async def fake_call_llm(*, client, messages):
+        _ = client
+        captured_messages.append(messages.copy())
+        return call_sequence.pop(0)
+
+    monkeypatch.setattr("agent.loop.call_llm", fake_call_llm)
+
+    report = await run_rca_agent(
+        table_fqn="mysql.default.raw_orders",
+        test_case_fqn="orders_row_count_check",
+        triggered_at="2026-04-20T10:00:00+00:00",
+        db_session=None,
+    )
+
+    assert report.confidence_label == ConfidenceLabel.HIGH
+    assert len(captured_messages) == 2
+    second_request = captured_messages[1]
+    assert not any(
+        message.get("role") == "assistant" and "x" * 100 in str(message.get("content", ""))
+        for message in second_request
+    )
+    assert second_request[-1]["role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_run_rca_agent_caches_duplicate_tool_calls(monkeypatch):
+    call_sequence = [
+        _tool_call_response(
+            "get_upstream_lineage", {"table_fqn": "mysql.default.raw_orders"}
+        ),
+        _tool_call_response(
+            "get_upstream_lineage", {"table_fqn": "mysql.default.raw_orders"}
+        ),
+        _stop_response(_report_content(confidence_score=0.9, confidence_label="LOW")),
+    ]
+    dispatch_calls: list[str] = []
+    captured_messages: list[list[dict[str, object]]] = []
+
+    async def fake_call_llm(*, client, messages):
+        _ = client
+        captured_messages.append(messages.copy())
+        return call_sequence.pop(0)
+
+    async def fake_dispatch_tool(tool_name: str, args: dict, db_session):
+        _ = (args, db_session)
+        dispatch_calls.append(tool_name)
+        return {"upstream_nodes": [{"fqn": "airflow.ingest_orders_daily", "level": 1}]}
+
+    monkeypatch.setattr("agent.loop.call_llm", fake_call_llm)
+    monkeypatch.setattr("agent.loop.dispatch_tool", fake_dispatch_tool)
+
+    report = await run_rca_agent(
+        table_fqn="mysql.default.raw_orders",
+        test_case_fqn="orders_row_count_check",
+        triggered_at="2026-04-20T10:00:00+00:00",
+        db_session=None,
+    )
+
+    assert report.confidence_label == ConfidenceLabel.HIGH
+    assert dispatch_calls == ["get_upstream_lineage"]
+    second_tool_response = captured_messages[2][-1]
+    assert second_tool_response["role"] == "tool"
+    assert "Identical tool call already executed" in second_tool_response["content"]

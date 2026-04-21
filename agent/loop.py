@@ -45,6 +45,12 @@ TOOL_COLLECTION_PROMPT = (
     "After tool results are available, return strict JSON only."
 )
 
+TRUNCATION_PROMPT = (
+    "Your previous answer was truncated. "
+    "Do not repeat prior prose. Return ONLY compact valid JSON, or call the next tool "
+    "if more evidence is required."
+)
+
 
 def _parse_triggered_at(value: str) -> datetime:
     try:
@@ -68,6 +74,10 @@ def _parse_tool_arguments(raw_arguments: object) -> tuple[dict[str, object], str
             return {}, raw_arguments
         return parsed if isinstance(parsed, dict) else {}, raw_arguments
     return {}, "{}"
+
+
+def _tool_cache_key(tool_name: str, args: dict[str, object]) -> str:
+    return f"{tool_name}:{json.dumps(args, sort_keys=True, default=str)}"
 
 
 def _extract_tool_calls(message: object) -> list[dict[str, object]]:
@@ -111,6 +121,15 @@ def _assistant_message_payload(message: object) -> dict[str, object]:
             for call in tool_calls
         ]
     return payload
+
+
+def _compact_retry_messages(
+    messages: list[dict[str, object]],
+    *,
+    retry_prompt: str,
+) -> None:
+    """Append a compact retry instruction without preserving oversized drafts."""
+    messages.append({"role": "user", "content": retry_prompt})
 
 
 def _build_fallback_report(
@@ -231,6 +250,7 @@ async def run_rca_agent(
     correction_sent = False
     tool_collection_prompt_sent = False
     rate_limit_retries = 0
+    tool_result_cache: dict[str, dict[str, object]] = {}
 
     while iteration < settings.llm_max_iterations:
         logger.info(
@@ -306,7 +326,6 @@ async def run_rca_agent(
                 iteration=iteration + 1,
             )
 
-        messages.append(_assistant_message_payload(message))
         finish_reason = getattr(choice, "finish_reason", "stop")
 
         if finish_reason == "stop":
@@ -322,7 +341,10 @@ async def run_rca_agent(
                 )
                 if tool_calls_made == 0 and not tool_collection_prompt_sent:
                     tool_collection_prompt_sent = True
-                    messages.append({"role": "user", "content": TOOL_COLLECTION_PROMPT})
+                    _compact_retry_messages(
+                        messages,
+                        retry_prompt=TOOL_COLLECTION_PROMPT,
+                    )
                     iteration += 1
                     continue
                 if correction_sent:
@@ -334,7 +356,10 @@ async def run_rca_agent(
                         iteration=iteration + 1,
                     )
                 correction_sent = True
-                messages.append({"role": "user", "content": CORRECTION_PROMPT})
+                _compact_retry_messages(
+                    messages,
+                    retry_prompt=CORRECTION_PROMPT,
+                )
                 iteration += 1
                 continue
 
@@ -343,18 +368,39 @@ async def run_rca_agent(
             return report
 
         if finish_reason == "tool_calls":
+            messages.append(_assistant_message_payload(message))
             for tool_call in _extract_tool_calls(message):
                 tool_name = str(tool_call.get("name", ""))
                 tool_args = tool_call.get("args", {})
                 if not isinstance(tool_args, dict):
                     tool_args = {}
-                started = perf_counter()
-                result = await dispatch_tool(
-                    tool_name=tool_name, args=tool_args, db_session=db_session
-                )
-                duration_ms = int((perf_counter() - started) * 1000)
-                success = "error" not in result
-                error_message = str(result.get("error")) if not success else None
+                cache_key = _tool_cache_key(tool_name, tool_args)
+
+                if cache_key in tool_result_cache:
+                    cached_result = tool_result_cache[cache_key]
+                    result = {
+                        "cached": True,
+                        "tool": tool_name,
+                        "message": (
+                            "Identical tool call already ran in this RCA run. "
+                            "Reuse the prior result."
+                        ),
+                    }
+                    duration_ms = 0
+                    success = "error" not in cached_result
+                    error_message = (
+                        str(cached_result.get("error")) if not success else None
+                    )
+                else:
+                    started = perf_counter()
+                    result = await dispatch_tool(
+                        tool_name=tool_name, args=tool_args, db_session=db_session
+                    )
+                    duration_ms = int((perf_counter() - started) * 1000)
+                    success = "error" not in result
+                    error_message = str(result.get("error")) if not success else None
+                    tool_result_cache[cache_key] = result
+
                 await log_tool_call(
                     incident_id=incident_id,
                     tool_name=tool_name,
@@ -383,6 +429,8 @@ async def run_rca_agent(
             iteration=iteration,
             finish_reason=finish_reason,
         )
+        if finish_reason == "length":
+            _compact_retry_messages(messages, retry_prompt=TRUNCATION_PROMPT)
         iteration += 1
 
     logger.warning(
