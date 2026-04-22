@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Incidents</h2>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">Incident queue</p>
+    <h2>Incidents</h2>
+  </div>
+  <div class="page-meta">Showing latest incidents</div>
+</section>
 {% if incidents %}
-<table>
+<table class="incidents-table">
   <thead>
     <tr>
       <th>Table FQN</th>
@@ -10,21 +16,42 @@
       <th>Status</th>
       <th>Confidence</th>
       <th>Blast Radius</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
     {% for incident in incidents %}
     <tr>
-      <td>{{ incident.table_fqn }}</td>
+      <td>
+        <div class="primary-text">{{ incident.table_fqn }}</div>
+        <div class="secondary-text">{{ incident.test_case_fqn }}</div>
+      </td>
       <td>{{ incident.triggered_at }}</td>
-      <td><span class="badge status-{{ incident.status.value.lower() }}">{{ incident.status.value }}</span></td>
-      <td><span class="badge confidence-{{ incident.confidence_label.value.lower() }}">{{ incident.confidence_label.value }}</span></td>
+      <td>
+        <span class="badge status-{{ incident.status.value.lower() }}">
+          {% if incident.status.value.lower() == "processing" %}
+          <span class="spinner" aria-hidden="true"></span>
+          {% endif %}
+          {{ incident.status.value }}
+        </span>
+      </td>
+      <td>
+        <span class="badge confidence-{{ incident.confidence_label.value.lower() }}">
+          {{ incident.confidence_label.value }}
+        </span>
+      </td>
       <td>{{ incident.blast_radius_count }}</td>
+      <td>
+        <a class="text-link" href="/incidents/{{ incident.id }}">View</a>
+      </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 {% else %}
-<p>No incidents yet. Trigger a webhook to populate the dashboard.</p>
+<div class="empty-state">
+  <h3>No incidents yet</h3>
+  <p>Trigger a webhook to populate the dashboard and watch RCA events appear here.</p>
+</div>
 {% endif %}
 {% endblock %}

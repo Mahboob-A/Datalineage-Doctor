@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     slack_enabled: bool = False
     slack_webhook_url: str = ""
 
+    app_base_url: str = "http://localhost:8000"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

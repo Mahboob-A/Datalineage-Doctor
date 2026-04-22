@@ -4,14 +4,35 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DataLineage Doctor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <header class="header">
       <div class="container">
-        <h1>DataLineage Doctor</h1>
-        <nav>
+        <div class="brand">
+          <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="3" y="8" width="42" height="32" rx="10" />
+            <path d="M14 28c4-8 9-12 15-12" />
+            <path d="M20 31c3-5 6-8 10-8" />
+            <circle cx="31" cy="18" r="3" />
+          </svg>
+          <div>
+            <p class="brand-title">DataLineage Doctor</p>
+            <p class="brand-subtitle">RCA dashboard</p>
+          </div>
+        </div>
+        <nav class="nav">
           <a href="/">Dashboard</a>
+          <a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
+          <button class="theme-toggle" type="button" aria-label="Toggle theme" disabled>
+            Theme
+          </button>
         </nav>
       </div>
     </header>

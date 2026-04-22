@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="detail-hero">
+  <div>
+    <p class="eyebrow">Incident detail</p>
+    <h2>{{ incident.table_fqn }}</h2>
+    <p class="subtext">Triggered at {{ incident.triggered_at }}</p>
+  </div>
+  <div class="detail-status">
+    <span class="badge status-{{ incident.status.value.lower() }}">
+      {% if incident.status.value.lower() == "processing" %}
+      <span class="spinner" aria-hidden="true"></span>
+      {% endif %}
+      {{ incident.status.value }}
+    </span>
+    <span class="badge confidence-{{ incident.confidence_label.value.lower() }}">
+      {{ incident.confidence_label.value }} confidence
+    </span>
+  </div>
+</section>
+
+<section class="detail-grid">
+  <article class="panel">
+    <h3>Root cause summary</h3>
+    {% if incident.root_cause_summary %}
+    <p>{{ incident.root_cause_summary }}</p>
+    {% else %}
+    <p class="muted">RCA is still processing. Check back in a moment.</p>
+    {% endif %}
+
+    <div class="confidence-ring confidence-{{ incident.confidence_label.value.lower() }}">
+      <div>
+        <span class="confidence-score">{{ "%.2f"|format(incident.confidence_score) }}</span>
+        <span class="confidence-label">Score</span>
+      </div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <h3>Evidence chain</h3>
+    {% if incident.evidence_chain %}
+    <ol>
+      {% for item in incident.evidence_chain %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">Evidence will appear once the RCA completes.</p>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <h3>Remediation steps</h3>
+    {% if incident.remediation_steps %}
+    <ol>
+      {% for step in incident.remediation_steps %}
+      <li>{{ step }}</li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">Remediation steps will appear once the RCA completes.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h3>Lineage graph</h3>
+    <p class="muted">Root cause highlighted in red. Downstream impacts in amber.</p>
+  </div>
+  <div id="lineage-graph" class="lineage-graph" aria-label="Lineage graph"></div>
+  <script id="graph-data" type="application/json">{{ graph_data | tojson }}</script>
+</section>
+
+<section class="detail-split">
+  <article class="panel">
+    <h3>Timeline</h3>
+    {% if timeline_events %}
+    <ul class="timeline">
+      {% for event in timeline_events %}
+      <li>
+        <div class="timeline-dot"></div>
+        <div>
+          <div class="timeline-title">{{ event.event_type }}</div>
+          <div class="timeline-meta">{{ event.occurred_at }} · {{ event.entity_fqn }}</div>
+          <p class="timeline-desc">{{ event.description }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Timeline events will appear once the RCA completes.</p>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <h3>Blast radius</h3>
+    {% if blast_radius_grouped %}
+    {% for level, consumers in blast_radius_grouped.items() %}
+    <h4 class="blast-level">Level {{ level }}</h4>
+    <table class="blast-table">
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Type</th>
+          <th>Service</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for consumer in consumers %}
+        <tr>
+          <td>{{ consumer.entity_fqn }}</td>
+          <td>
+            <span class="entity-icon entity-{{ consumer.entity_type|lower }}">
+              {{ consumer.entity_type[:1] | upper }}
+            </span>
+            {{ consumer.entity_type }}
+          </td>
+          <td>{{ consumer.service }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+    {% else %}
+    <p class="muted">Blast radius will appear once the RCA completes.</p>
+    {% endif %}
+  </article>
+</section>
+
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/reactflow@11.11.3/dist/style.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reactflow@11.11.3/dist/reactflow.min.js"></script>
+<script>
+  (function () {
+    const container = document.getElementById("lineage-graph");
+    const graphDataTag = document.getElementById("graph-data");
+    if (!container || !graphDataTag || !window.ReactFlow) {
+      return;
+    }
+    const data = JSON.parse(graphDataTag.textContent || "{\"nodes\":[],\"edges\":[]}");
+    const ReactFlow = window.ReactFlow.ReactFlow;
+    const Controls = window.ReactFlow.Controls;
+    const Background = window.ReactFlow.Background;
+
+    function CustomNode(props) {
+      const className = ["node-card", props.data.direction].join(" ");
+      const rootClass = props.data.is_root_cause ? "root" : "";
+      return React.createElement(
+        "div",
+        { className: className + " " + rootClass },
+        React.createElement("div", { className: "node-label" }, props.data.label),
+        React.createElement("div", { className: "node-meta" }, props.data.service)
+      );
+    }
+
+    const element = React.createElement(
+      ReactFlow,
+      {
+        nodes: data.nodes,
+        edges: data.edges,
+        nodeTypes: { custom: CustomNode },
+        fitView: true,
+        nodesDraggable: false,
+        nodesConnectable: false,
+      },
+      React.createElement(Background, { gap: 16, size: 1, color: "#e2e8f0" }),
+      React.createElement(Controls)
+    );
+
+    const root = ReactDOM.createRoot(container);
+    root.render(element);
+  })();
+</script>
+{% endblock %}
