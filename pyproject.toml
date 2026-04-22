@@ -29,6 +29,7 @@ dev = [
   "pytest-mock>=3.14",
   "anyio>=4.6",
   "ruff>=0.7",
+  "respx>=0.23.1",
 ]
 
 [tool.pytest.ini_options]

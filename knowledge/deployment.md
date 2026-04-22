@@ -105,6 +105,7 @@ SLACK_ENABLED=true
 APP_ENV=development
 APP_PORT=8000
 LOG_LEVEL=INFO
+APP_BASE_URL=http://localhost:8000
 ```
 
 ### Switching LLM providers

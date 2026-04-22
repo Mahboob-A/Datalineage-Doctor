@@ -67,3 +67,25 @@ async def save_incident(
 
     await db.commit()
     return incident.id
+
+
+async def set_slack_notified(db: AsyncSession, incident_id: UUID, value: bool) -> None:
+    """Persist the Slack notification flag for an incident."""
+    query = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = query.scalar_one_or_none()
+    if incident is None:
+        return
+    incident.slack_notified = value
+    await db.commit()
+
+
+async def set_om_incident_id(
+    db: AsyncSession, incident_id: UUID, om_incident_id: str
+) -> None:
+    """Persist the OpenMetadata incident ID for an incident."""
+    query = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = query.scalar_one_or_none()
+    if incident is None:
+        return
+    incident.om_incident_id = om_incident_id
+    await db.commit()
