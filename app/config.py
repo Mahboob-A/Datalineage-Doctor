@@ -10,9 +10,13 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/1"
 
+    # llm_api_key: str
+    # llm_base_url: str = "https://api.cerebras.ai/v1"
+    # llm_model: str = "llama3.1-8b"
+
     llm_api_key: str
-    llm_base_url: str = "https://api.cerebras.ai/v1"
-    llm_model: str = "llama3.1-8b"
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    llm_model: str = "gemini-2.5-flash"
     llm_timeout_seconds: int = 90
     llm_max_iterations: int = 4
     llm_client_max_retries: int = 0

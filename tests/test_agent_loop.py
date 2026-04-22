@@ -288,4 +288,4 @@ async def test_run_rca_agent_caches_duplicate_tool_calls(monkeypatch):
     assert dispatch_calls == ["get_upstream_lineage"]
     second_tool_response = captured_messages[2][-1]
     assert second_tool_response["role"] == "tool"
-    assert "Identical tool call already executed" in second_tool_response["content"]
+    assert "Identical tool call already ran" in second_tool_response["content"]

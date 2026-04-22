@@ -2,7 +2,7 @@
 
 **Project:** DataLineage Doctor
 **Version:** 1.0
-**Last Updated:** April 21, 2026
+**Last Updated:** April 22, 2026
 **Updated By:** AI Agent
 
 > **Instructions for the AI:** Read this document at the start of every session. It tells you exactly where development stands, what is done, what is in progress, and what is next. After completing any task, remind the engineer to update this document.
@@ -29,7 +29,7 @@ DataLineage Doctor is a solo-built hackathon project for the OpenMetadata Hackat
 | Database | PostgreSQL 16 |
 | ORM | SQLAlchemy 2.0 async |
 | Migrations | Alembic |
-| LLM SDK | `openai` (OpenAI-compatible, default: Gemini 2.0 Flash) |
+| LLM SDK | `openai` (OpenAI-compatible, default: Gemini 2.5 Flash) |
 | HTTP client | `httpx` async |
 | Package manager | `uv` |
 | Config | `pydantic-settings` |
@@ -45,8 +45,8 @@ DataLineage Doctor is a solo-built hackathon project for the OpenMetadata Hackat
 
 ## Current Sprint
 
-**Sprint 2 — Agent Tools** (April 19–20)
-**Goal:** Build and test all 6 real RCA tools and move from stubbed analysis to real OpenMetadata-backed reasoning.
+**Sprint 3 — Dashboard + Notifications** (April 21–22)
+**Goal:** Complete the incident detail experience, lineage visualization, and notification integrations now that the live RCA path is validated.
 
 ---
 
@@ -86,22 +86,19 @@ Demo video recording, submission write-up, final README review.
 ## Done (Across All Sprints)
 
 - Sprint 1 completed: DLD-001 through DLD-010.
+- Sprint 2 completed: DLD-011 through DLD-019.
 
 ---
 
 ## In Progress
 
-- Sprint 2 remains open pending runtime validation gates.
-- DLD-011 through DLD-017 are implemented and locally validated.
-- DLD-018 is now complete with live OpenMetadata validation and an idempotent rerun.
-- DLD-019 smoke test remains blocked by the live LLM provider context-length limit, not by OM/runtime availability.
+- Sprint 3 planning is ready to begin from `knowledge/plan/agent-plan-sprint-3-1.md`.
 
 ---
 
 ## Blocked
 
-- The local stack is running and OpenMetadata is reachable, but the live RCA smoke run still fails with provider error `context_length_exceeded`.
-- Sprint 2 cannot close until DLD-019 produces a real HIGH-confidence report rather than the fallback LOW-confidence error report.
+- No active project blockers at the Sprint 2 boundary.
 
 ---
 
@@ -138,7 +135,10 @@ _(Update this section at the end of each working session with any decisions made
 - Sprint 2 core tooling (DLD-011 to DLD-017) remains complete, with local lint passing and `40` tests passing.
 - Seed and trigger scripts are implemented for Sprint 2 demo flow; DLD-018 now passes live OM validation and idempotency.
 - Local runtime was restored by starting Docker Compose and refreshing the OpenMetadata JWT used by the repo.
-- The current Sprint 2 blocker is the live LLM provider's 8192-token context ceiling during DLD-019, even after agent-loop compaction improvements.
+- Switched the live RCA provider to Gemini 2.5 Flash using the existing OpenAI-compatible integration path.
+- Refreshed `OM_JWT_TOKEN` and recreated `app` and `worker`, restoring authenticated OM access after the stack restart.
+- DLD-019 now passes live validation with a HIGH-confidence RCA, 4 timeline events, 4 blast-radius consumers, and `/metrics` recording `rca_requests_total{status="success"} 1.0`.
+- Sprint 2 completed via agent-plan-sprint-2-1.
 
 ---
 

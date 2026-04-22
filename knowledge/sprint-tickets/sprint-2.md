@@ -231,3 +231,16 @@ Run `scripts/trigger_demo.py` against the seeded OM data and verify that the rea
 
 ### Sprint 2 Definition of Done
 All 9 tickets ✅, real agent produces HIGH-confidence report on demo data, ≥ 35 tests passing.
+
+### Agent Plan Traceability
+- Plan ID: agent-plan-sprint-2-1
+- Completion date: 2026-04-22
+- Covered tickets: DLD-011 to DLD-019
+- Major decisions:
+  - Confidence label derived from score in parser.
+  - Mocked LLM for tests, real LLM for smoke run.
+  - Switched the live smoke run to Gemini 2.5 Flash through the existing OpenAI-compatible integration path.
+  - Refreshed `OM_JWT_TOKEN` and recreated `app` and `worker` to restore authenticated OM access after the stack restart.
+- Deviations from plan:
+  - A temporary OpenMetadata auth failure blocked the final smoke run until the JWT and containers were refreshed.
+  - `tests/test_agent_loop.py` needed a small assertion update to match the current duplicate-tool-call cache message.

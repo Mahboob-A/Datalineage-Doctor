@@ -7,42 +7,31 @@
 - Tickets: `knowledge/sprint-tickets/sprint-2.md`
 - Progress baseline: this Sprint 2 progress log
 - Verification performed this session:
-  - `uv run pytest tests -q` -> `40 passed, 1 warning`
+  - `uv run pytest tests -q` -> `42 passed, 1 warning`
   - `uv run ruff check .` -> passed
-  - `make dev` -> local stack started successfully
   - `uv run python scripts/seed_demo.py` -> succeeded
   - `uv run python scripts/seed_demo.py` rerun -> idempotent success
+  - refreshed `OM_JWT_TOKEN` in `.env`
+  - recreated `app` and `worker` containers to reload `.env`
   - `uv run python scripts/trigger_demo.py` -> webhook queued successfully
-  - live smoke run persisted incidents end to end, but the RCA still fell back due LLM context-length failure
+  - final live smoke run completed with a real HIGH-confidence RCA
 
 ### Sprint 2 Plan Completion Snapshot
 - Plan scope considered: DLD-011 through DLD-019 (9 tickets total).
-- Fully completed tickets: 8/9 (**88.9%**) -> DLD-011 through DLD-018.
-- Blocked tickets: 1/9 (**11.1%**) -> DLD-019 remains blocked by the live LLM provider context-length ceiling.
-- Overall sprint status: Sprint 2 engineering and runtime setup are complete through the seed/idempotency gate; Sprint 2 is not closed because the real-agent smoke run still falls back under live provider constraints.
+- Fully completed tickets: 9/9 (**100%**) -> DLD-011 through DLD-019.
+- Blocked tickets: 0/9 (**0%**).
+- Overall sprint status: Sprint 2 is complete.
 
 ### What Worked
-- Docker Compose runtime now starts successfully with OpenMetadata reachable on the local stack.
-- `scripts/seed_demo.py` now passes its live validation gate.
-- `scripts/seed_demo.py` reruns idempotently and now ends at `created=0 existing=36 failed=0`.
-- Webhook queueing, Celery worker execution, OM tool calls, incident persistence, and `/metrics` all work in the live environment.
-- `agent/loop.py` improvements landed and targeted regression tests pass.
+- Docker Compose runtime and OpenMetadata stack are healthy.
+- `scripts/seed_demo.py` passes its live validation gate and reruns idempotently at `created=0 existing=36 failed=0`.
+- Gemini 2.5 Flash successfully completes the live RCA loop through the existing OpenAI-compatible integration path.
+- OpenMetadata-backed tool calls succeed live after refreshing the JWT and recreating the service containers.
+- Webhook queueing, Celery worker execution, incident persistence, and `/metrics` work in the live environment.
 
-### What Failed
-- DLD-019 still failed its acceptance gate.
-- The live RCA did not return a real HIGH-confidence non-stub report.
-- The persisted incident completed with fallback output instead of a reasoning-backed RCA:
-  - `root_cause_summary` = fallback error text
-  - `confidence_label` = `LOW`
-  - `timeline_count` = `1`
-  - `blast_count` = `0`
-
-### Why It Failed
-- The selected live LLM provider rejected the request history with `context_length_exceeded`.
-- Latest observed provider failure:
-  - `Current length is 12793 while limit is 8192`
-- The runtime path is no longer blocked by Docker, OpenMetadata, auth, or webhook delivery.
-- The remaining failure is in the live inference stage, where the tool-call conversation history still grows beyond the provider's context window.
+### Temporary Failure During Closure
+- After the AI provider switch (from cerebras to Gemini) and stack restart, the OpenMetadata JWT in `.env` was stale.
+- Live OM API calls returned `401 Unauthorized` until `OM_JWT_TOKEN` was refreshed and the `app` and `worker` containers were recreated.
 
 ### Ticket-by-Ticket Status Against Plan
 | Ticket | Planned Outcome | Current Status | Notes |
@@ -55,71 +44,41 @@
 | DLD-016 | Blast radius traversal + sorting | Done | Downstream lineage support implemented and covered by lineage tool tests. |
 | DLD-017 | Past incident lookup from local DB | Done | `agent/tools/history.py` implemented and tested. |
 | DLD-018 | Idempotent demo seed script for OM topology | Done | Live OM validation passed; rerun now ends at `created=0 existing=36 failed=0`. |
-| DLD-019 | Real end-to-end smoke run with live LLM and seeded OM | Blocked | Queue, worker, persistence, OM tools, and metrics path all run, but the live RCA still falls back because the provider rejects the message history with `context_length_exceeded`. |
+| DLD-019 | Real end-to-end smoke run with live LLM and seeded OM | Done | Final live incident completed with HIGH confidence, 4 timeline events, 4 blast-radius consumers, and `/metrics` recorded `rca_requests_total{status="success"} 1.0`. |
+
+### Final DLD-019 Outcome
+- Latest live incident: `a7ed0d7d-1784-4a4b-8e1b-18f3bee44ef3`
+- Status: `COMPLETE`
+- Root cause summary: identified `airflow.ingest_orders_daily` and its `load_orders` task failure as the upstream cause.
+- Confidence label: `HIGH`
+- Timeline events recorded: `4`
+- Blast-radius consumers recorded: `4`
+- Worker log result: `Task worker.tasks.rca_task[...] succeeded`
+- Metrics confirmation: `rca_requests_total{status="success"} 1.0`
 
 ### Completed
-- Sprint 2 plan execution has delivered the full core tool layer from DLD-011 through DLD-017.
-- Real agent loop implemented with parser integration, retry behavior, tool dispatch, and tool-call logging.
-- All six Sprint 2 RCA tools are implemented:
-  - `get_upstream_lineage`
-  - `get_dq_test_results`
-  - `get_pipeline_entity_status`
-  - `get_entity_owners`
-  - `calculate_blast_radius`
-  - `find_past_incidents`
-- `scripts/seed_demo.py` was expanded to seed the Sprint 2 demo topology, including services, tables, lineage, pipeline state, and DQ test cases.
+- Sprint 2 plan execution delivered the full RCA tool layer from DLD-011 through DLD-017.
+- `scripts/seed_demo.py` now seeds the Sprint 2 demo topology and reruns cleanly without duplicates.
 - `scripts/trigger_demo.py` is aligned to the Sprint 2 failure scenario for `null_check_order_id`.
-- `scripts/seed_demo.py` was fixed for true idempotency by detecting existing lineage edges and existing pipeline status before writing.
-- Local OM access was restored by starting the Compose stack and refreshing `OM_JWT_TOKEN` in `.env`.
-- `agent/loop.py` was improved to retry compactly after malformed/truncated outputs and to cache duplicate tool calls within a single RCA run.
+- The live provider path is now Gemini 2.5 Flash.
+- The cached duplicate-tool-call regression test was aligned with current `agent/loop.py` behavior.
 - Automated quality gates verified this session:
-  - `uv run pytest tests -q` -> `40 passed, 1 warning`
+  - `uv run pytest tests -q` -> `42 passed, 1 warning`
   - `uv run ruff check .` -> passed
 
 ### In Progress
-- No Sprint 2 implementation tickets remain in progress. The remaining work is concentrated in the DLD-019 smoke-test closure.
+- No Sprint 2 work remains in progress.
 
 ### Blockers
-- The stack and OM runtime are reachable now, but the live LLM provider still fails during DLD-019 with:
-  - `context_length_exceeded`
-  - `Current length is 12793 while limit is 8192`
-- Latest live smoke outcome:
-  - incident persisted with `status=COMPLETE`
-  - `root_cause_summary` is fallback text
-  - `confidence_label=LOW`
-  - `timeline_count=1`
-  - `blast_count=0`
-- Because of that LLM failure, the smoke run does not satisfy Sprint 2 acceptance criteria for HIGH-confidence non-stub RCA output.
+- No open Sprint 2 blockers remain.
 
 ### Validation Notes
-- The previous progress entry understated current automated validation coverage; the repo now verifies at `40 passed` tests rather than `36`.
-- DLD-018 now passes live validation:
-  - first successful seeded run produced `created=8 existing=28 failed=0`
-  - idempotency rerun now produces `created=0 existing=36 failed=0`
-- `/metrics` now records the queued smoke request path, including `rca_requests_total{status="success"} 1.0`, but the RCA content still fails the report-quality acceptance gate.
-- Lint is clean, and focused agent-loop regression tests pass (`tests/test_agent_loop.py`: `6 passed`).
-- Sprint 3 planning exists in `knowledge/plan/agent-plan-sprint-3-1.md`, but that plan itself correctly treats Sprint 2 closure as a prerequisite.
+- The repo now verifies at `42 passed` tests.
+- The acceptance gate that previously failed due provider context limits is now cleared on Gemini 2.5 Flash.
+- Sprint 3 planning in `knowledge/plan/agent-plan-sprint-3-1.md` is now unblocked.
 
 ### Next Step
-1. Fix DLD-019 by reducing the live RCA message footprint enough to stay under the provider's 8192-token limit.
-
-### Recommended Next Actions
-1. Prioritize one of these fixes for DLD-019:
-   - reduce tool-result payload size passed back into the model
-   - cap or gate repeated tool usage more aggressively
-   - switch the live smoke run to an OpenAI-compatible model/provider with a larger context window
-2. Rerun `uv run python scripts/trigger_demo.py` after the loop/prompt/provider change.
-3. Validate the DLD-019 acceptance checks:
-   - non-stub root cause summary
-   - `confidence_label = HIGH`
-   - at least 3 timeline events
-   - at least 2 blast radius consumers
-   - successful RCA metric increment in `/metrics`
-4. Once DLD-019 passes, mark Sprint 2 complete and update:
-   - `knowledge/sprint-tickets/sprint-2.md` traceability section
-   - `knowledge/agent-sync/ai-project-status.md`
-   - this progress log
+1. Start Sprint 3 using `knowledge/plan/agent-plan-sprint-3-1.md`.
 
 ### Recommended Sprint Framing
-- Sprint 2 is best described as **runtime-ready but smoke-test blocked on live LLM limits**.
-- The highest-value next action is no longer OpenMetadata setup; it is getting one successful live HIGH-confidence RCA run through the chosen model/provider.
+- Sprint 2 is best described as **completed with live Gemini-backed RCA validation**.
