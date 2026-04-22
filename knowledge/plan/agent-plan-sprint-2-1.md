@@ -134,6 +134,39 @@ After Sprint 2 completes:
 2. Update knowledge/agent-sync/ai-project-status.md under Decisions Made This Session:
 - Sprint 2 completed via agent-plan-sprint-2-1.
 
+## Execution Outcome Update
+
+### Status As Of 2026-04-22
+- Sprint 2 is not fully closed.
+- DLD-011 through DLD-018 are complete.
+- DLD-019 remains blocked.
+
+### What Was Successfully Delivered
+- Real tool-calling LLM loop, parser integration, retries, and tool-call logging.
+- All six real RCA tools from DLD-012 through DLD-017.
+- Live OpenMetadata runtime validation for the demo seed script.
+- True idempotency for `scripts/seed_demo.py`.
+- End-to-end queue, worker, OpenMetadata access, DB persistence, and metrics validation path.
+
+### What Failed Relative To Plan
+- The final acceptance gate for DLD-019 did not pass.
+- The live smoke run completed operationally, but the persisted incident still used the fallback LOW-confidence report instead of a real HIGH-confidence RCA.
+
+### Why DLD-019 Failed
+- The live LLM provider rejected the request history with `context_length_exceeded`.
+- Latest observed failure:
+  - `Current length is 12793 while limit is 8192`
+- This means the current blocker is no longer Docker, OpenMetadata reachability, or JWT auth.
+- The blocker is the live provider context window during the final RCA reasoning loop.
+
+### Deviations From Plan
+- The plan assumed DLD-019 would be the final smoke gate after DLD-018 and would pass once the runtime was healthy.
+- In execution, additional work was required after DLD-018 to restore OM auth and to make `scripts/seed_demo.py` truly idempotent.
+- Additional loop compaction and duplicate-tool-call caching work was completed to reduce message growth, but that was still not sufficient to pass DLD-019 with the current provider.
+
+### Immediate Next Step
+- Reduce the live RCA message footprint further or switch the smoke test to an OpenAI-compatible provider/model with a larger context window, then rerun DLD-019.
+
 ## Next Plan Trigger
 Before Sprint 3 starts, create next plan:
 - knowledge/plan/agent-plan-sprint-3-1.md

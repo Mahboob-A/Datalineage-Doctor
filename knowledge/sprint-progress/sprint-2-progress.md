@@ -1,6 +1,6 @@
 # Sprint 2 Progress Log
 
-## 2026-04-21
+## 2026-04-22
 
 ### Scope Reviewed
 - Plan: `knowledge/plan/agent-plan-sprint-2-1.md`
@@ -13,13 +13,36 @@
   - `uv run python scripts/seed_demo.py` -> succeeded
   - `uv run python scripts/seed_demo.py` rerun -> idempotent success
   - `uv run python scripts/trigger_demo.py` -> webhook queued successfully
-  - Live smoke result persisted, but report fell back due LLM context-length failure
+  - live smoke run persisted incidents end to end, but the RCA still fell back due LLM context-length failure
 
 ### Sprint 2 Plan Completion Snapshot
 - Plan scope considered: DLD-011 through DLD-019 (9 tickets total).
 - Fully completed tickets: 8/9 (**88.9%**) -> DLD-011 through DLD-018.
 - Blocked tickets: 1/9 (**11.1%**) -> DLD-019 remains blocked by the live LLM provider context-length ceiling.
 - Overall sprint status: Sprint 2 engineering and runtime setup are complete through the seed/idempotency gate; Sprint 2 is not closed because the real-agent smoke run still falls back under live provider constraints.
+
+### What Worked
+- Docker Compose runtime now starts successfully with OpenMetadata reachable on the local stack.
+- `scripts/seed_demo.py` now passes its live validation gate.
+- `scripts/seed_demo.py` reruns idempotently and now ends at `created=0 existing=36 failed=0`.
+- Webhook queueing, Celery worker execution, OM tool calls, incident persistence, and `/metrics` all work in the live environment.
+- `agent/loop.py` improvements landed and targeted regression tests pass.
+
+### What Failed
+- DLD-019 still failed its acceptance gate.
+- The live RCA did not return a real HIGH-confidence non-stub report.
+- The persisted incident completed with fallback output instead of a reasoning-backed RCA:
+  - `root_cause_summary` = fallback error text
+  - `confidence_label` = `LOW`
+  - `timeline_count` = `1`
+  - `blast_count` = `0`
+
+### Why It Failed
+- The selected live LLM provider rejected the request history with `context_length_exceeded`.
+- Latest observed provider failure:
+  - `Current length is 12793 while limit is 8192`
+- The runtime path is no longer blocked by Docker, OpenMetadata, auth, or webhook delivery.
+- The remaining failure is in the live inference stage, where the tool-call conversation history still grows beyond the provider's context window.
 
 ### Ticket-by-Ticket Status Against Plan
 | Ticket | Planned Outcome | Current Status | Notes |
@@ -77,20 +100,22 @@
 - Lint is clean, and focused agent-loop regression tests pass (`tests/test_agent_loop.py`: `6 passed`).
 - Sprint 3 planning exists in `knowledge/plan/agent-plan-sprint-3-1.md`, but that plan itself correctly treats Sprint 2 closure as a prerequisite.
 
-### Next Steps To Close Sprint 2
-1. Reduce the live RCA message footprint so the provider stays below its 8192-token limit.
-2. Prioritize one of these fixes for DLD-019:
+### Next Step
+1. Fix DLD-019 by reducing the live RCA message footprint enough to stay under the provider's 8192-token limit.
+
+### Recommended Next Actions
+1. Prioritize one of these fixes for DLD-019:
    - reduce tool-result payload size passed back into the model
    - cap or gate repeated tool usage more aggressively
    - switch the live smoke run to an OpenAI-compatible model/provider with a larger context window
-3. Rerun `uv run python scripts/trigger_demo.py` after the loop/prompt/provider change.
-4. Validate the DLD-019 acceptance checks:
+2. Rerun `uv run python scripts/trigger_demo.py` after the loop/prompt/provider change.
+3. Validate the DLD-019 acceptance checks:
    - non-stub root cause summary
    - `confidence_label = HIGH`
    - at least 3 timeline events
    - at least 2 blast radius consumers
    - successful RCA metric increment in `/metrics`
-5. Once DLD-019 passes, mark Sprint 2 complete and update:
+4. Once DLD-019 passes, mark Sprint 2 complete and update:
    - `knowledge/sprint-tickets/sprint-2.md` traceability section
    - `knowledge/agent-sync/ai-project-status.md`
    - this progress log
