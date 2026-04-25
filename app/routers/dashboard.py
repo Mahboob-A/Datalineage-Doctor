@@ -1,5 +1,8 @@
+import asyncio
+import sys
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -78,4 +81,39 @@ async def latest_incident_api(db: AsyncSession = Depends(get_db)) -> JSONRespons
             "table_fqn": incident.table_fqn,
             "test_case_fqn": incident.test_case_fqn,
         }
+    )
+
+
+logger = structlog.get_logger(__name__)
+
+
+@router.post("/api/demo/trigger")
+async def trigger_demo_incident() -> JSONResponse:
+    scripts = [
+        "scripts/wait_for_om.py",
+        "scripts/seed_demo.py",
+        "scripts/trigger_demo.py",
+    ]
+
+    for script in scripts:
+        logger.info("trigger_demo_script_start", script=script)
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            script,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            logger.error(
+                "trigger_demo_script_failed",
+                script=script,
+                returncode=process.returncode,
+                stderr=stderr.decode(),
+            )
+            raise HTTPException(status_code=500, detail=f"Failed to execute {script}")
+        logger.info("trigger_demo_script_success", script=script)
+
+    return JSONResponse(
+        content={"status": "success", "message": "Demo incident triggered successfully"}
     )

@@ -81,19 +81,27 @@ h4 {
   gap: 1rem;
 }
 
-.nav a {
+.nav a,
+.nav-btn {
   color: #c9e8f1;
   text-decoration: none;
   font-weight: 600;
+  font-family: inherit;
+  font-size: 1rem;
 }
 
-.theme-toggle {
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.nav-btn {
   background: transparent;
-  color: #fff;
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  line-height: inherit;
+}
+
+.nav-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .page-header {

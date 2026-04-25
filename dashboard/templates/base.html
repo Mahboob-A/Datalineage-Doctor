@@ -78,13 +78,80 @@
         </div>
         <nav class="nav">
           <a href="/">Dashboard</a>
-          <a href="https://github.com/mahboob-a/Datalineage-Doctor/" target="_blank" rel="noreferrer">GitHub</a>
-          <button class="theme-toggle" type="button" aria-label="Toggle theme" disabled>
-            Theme
+          <button id="trigger-incident-btn" class="nav-btn" type="button" aria-label="Trigger Incident">
+            Trigger Incident
           </button>
+          <a href="https://github.com/mahboob-a/Datalineage-Doctor/" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
       </div>
     </header>
     <main class="container">{% block content %}{% endblock %}</main>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const triggerBtn = document.getElementById("trigger-incident-btn");
+        let pollInterval = null;
+
+        const startPolling = () => {
+          if (pollInterval) return;
+          pollInterval = setInterval(async () => {
+            try {
+              const res = await fetch("/api/incidents/latest");
+              if (res.ok) {
+                const data = await res.json();
+                if (data.status === "COMPLETE" || data.status === "FAILED") {
+                  clearInterval(pollInterval);
+                  window.location.reload();
+                }
+              }
+            } catch (err) {
+              console.error("Polling error:", err);
+            }
+          }, 3000);
+        };
+
+        const checkInitialStatus = async () => {
+          try {
+            const res = await fetch("/api/incidents/latest");
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === "PROCESSING") {
+                if (triggerBtn) {
+                  triggerBtn.disabled = true;
+                  triggerBtn.textContent = "Processing...";
+                }
+                startPolling();
+              }
+            }
+          } catch (err) {
+            console.error("Failed to check status:", err);
+          }
+        };
+
+        if (triggerBtn) {
+          checkInitialStatus();
+
+          triggerBtn.addEventListener("click", async () => {
+            triggerBtn.disabled = true;
+            triggerBtn.textContent = "Processing...";
+            try {
+              const res = await fetch("/api/demo/trigger", { method: "POST" });
+              if (res.ok) {
+                startPolling();
+              } else {
+                const data = await res.json();
+                alert("Failed to trigger incident: " + (data.detail || res.statusText));
+                triggerBtn.disabled = false;
+                triggerBtn.textContent = "Trigger Incident";
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Error triggering incident. Check console.");
+              triggerBtn.disabled = false;
+              triggerBtn.textContent = "Trigger Incident";
+            }
+          });
+        }
+      });
+    </script>
   </body>
 </html>
