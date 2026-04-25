@@ -1,4 +1,6 @@
 import asyncio
+import html
+import re
 import sys
 from datetime import datetime
 from uuid import UUID
@@ -36,6 +38,17 @@ def format_datetime_ist(dt: datetime | str | None) -> str:
     return dt_ist.strftime("%d-%m-%Y %H:%M")
 
 templates.env.filters["format_datetime_ist"] = format_datetime_ist
+
+
+def render_inline_code(text: str | None) -> str:
+    """Replace `backtick-wrapped` spans with HTML <code> elements."""
+    if not text:
+        return ""
+    escaped = html.escape(text)
+    return re.sub(r"`([^`]+)`", r"<code class='inline-code'>\1</code>", escaped)
+
+
+templates.env.filters["render_inline_code"] = render_inline_code
 
 
 @router.get("/", response_class=HTMLResponse)

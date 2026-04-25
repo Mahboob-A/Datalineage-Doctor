@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var btn = document.getElementById("trigger-incident-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.title = "Triggering a new incident is only available from the dashboard.";
+    }
+  });
+</script>
+
 <section class="detail-hero">
   <div>
     <p class="eyebrow">Incident detail</p>
@@ -23,7 +33,7 @@
   <article class="panel">
     <h3>Root cause summary</h3>
     {% if incident.root_cause_summary %}
-    <p>{{ incident.root_cause_summary }}</p>
+    <p>{{ incident.root_cause_summary | render_inline_code | safe }}</p>
     {% else %}
     <p class="muted">RCA is still processing. Check back in a moment.</p>
     {% endif %}
@@ -41,7 +51,7 @@
     {% if incident.evidence_chain %}
     <ol>
       {% for item in incident.evidence_chain %}
-      <li>{{ item }}</li>
+      <li>{{ item | render_inline_code | safe }}</li>
       {% endfor %}
     </ol>
     {% else %}
@@ -54,7 +64,7 @@
     {% if incident.remediation_steps %}
     <ol>
       {% for step in incident.remediation_steps %}
-      <li>{{ step }}</li>
+      <li>{{ step | render_inline_code | safe }}</li>
       {% endfor %}
     </ol>
     {% else %}
@@ -81,9 +91,9 @@
       <li>
         <div class="timeline-dot"></div>
         <div>
-          <div class="timeline-title">{{ event.event_type }}</div>
-          <div class="timeline-meta">{{ event.occurred_at | format_datetime_ist }} · {{ event.entity_fqn }}</div>
-          <p class="timeline-desc">{{ event.description }}</p>
+          <div class="timeline-title">{{ event.event_type | render_inline_code | safe }}</div>
+          <div class="timeline-meta">{{ event.occurred_at | format_datetime_ist }} · {{ event.entity_fqn | render_inline_code | safe }}</div>
+          <p class="timeline-desc">{{ event.description | render_inline_code | safe }}</p>
         </div>
       </li>
       {% endfor %}
@@ -109,14 +119,14 @@
       <tbody>
         {% for consumer in consumers %}
         <tr>
-          <td>{{ consumer.entity_fqn }}</td>
+          <td>{{ consumer.entity_fqn | render_inline_code | safe }}</td>
           <td>
             <span class="entity-icon entity-{{ consumer.entity_type|lower }}">
               {{ consumer.entity_type[:1] | upper }}
             </span>
-            {{ consumer.entity_type }}
+            {{ consumer.entity_type | render_inline_code | safe }}
           </td>
-          <td>{{ consumer.service }}</td>
+          <td>{{ consumer.service | render_inline_code | safe }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -128,52 +138,115 @@
   </article>
 </section>
 
-<link
-  rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/reactflow@11.11.3/dist/style.css"
-/>
-<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/reactflow@11.11.3/dist/reactflow.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
 <script>
   (function () {
-    const container = document.getElementById("lineage-graph");
-    const graphDataTag = document.getElementById("graph-data");
-    if (!container || !graphDataTag || !window.ReactFlow) {
+    var container = document.getElementById("lineage-graph");
+    var graphDataTag = document.getElementById("graph-data");
+    if (!container || !graphDataTag) return;
+
+    var raw;
+    try {
+      raw = JSON.parse(graphDataTag.textContent || '{"nodes":[],"edges":[]}');
+    } catch (e) {
+      console.error("[lineage] Failed to parse graph data:", e);
       return;
     }
-    const data = JSON.parse(graphDataTag.textContent || "{\"nodes\":[],\"edges\":[]}");
-    const ReactFlow = window.ReactFlow.ReactFlow;
-    const Controls = window.ReactFlow.Controls;
-    const Background = window.ReactFlow.Background;
 
-    function CustomNode(props) {
-      const className = ["node-card", props.data.direction].join(" ");
-      const rootClass = props.data.is_root_cause ? "root" : "";
-      return React.createElement(
-        "div",
-        { className: className + " " + rootClass },
-        React.createElement("div", { className: "node-label" }, props.data.label),
-        React.createElement("div", { className: "node-meta" }, props.data.service)
-      );
+    if (!raw.nodes || raw.nodes.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:#6b7c86;padding:2rem;">No lineage data available for this incident.</p>';
+      return;
     }
 
-    const element = React.createElement(
-      ReactFlow,
-      {
-        nodes: data.nodes,
-        edges: data.edges,
-        nodeTypes: { custom: CustomNode },
-        fitView: true,
-        nodesDraggable: false,
-        nodesConnectable: false,
-      },
-      React.createElement(Background, { gap: 16, size: 1, color: "#e2e8f0" }),
-      React.createElement(Controls)
-    );
+    // Map ReactFlow-shaped data to Cytoscape element format
+    var elements = [];
+    raw.nodes.forEach(function (n) {
+      elements.push({
+        data: {
+          id: n.id,
+          label: n.data.label,
+          service: n.data.service,
+          direction: n.data.direction,
+          is_root_cause: n.data.is_root_cause
+        }
+      });
+    });
+    raw.edges.forEach(function (e) {
+      elements.push({
+        data: { id: e.id, source: e.source, target: e.target }
+      });
+    });
 
-    const root = ReactDOM.createRoot(container);
-    root.render(element);
+    var cy = cytoscape({
+      container: container,
+      elements: elements,
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'label': 'data(label)',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'font-family': '"IBM Plex Sans", "Segoe UI", sans-serif',
+            'font-size': '12px',
+            'font-weight': '600',
+            'color': '#102a43',
+            'background-color': '#f0f7fa',
+            'border-color': '#b6ceda',
+            'border-width': 2,
+            'border-style': 'solid',
+            'width': 'label',
+            'height': 'label',
+            'padding': '14px',
+            'shape': 'round-rectangle',
+            'text-wrap': 'wrap',
+            'text-max-width': '140px'
+          }
+        },
+        {
+          selector: 'node[direction = "root"]',
+          style: {
+            'background-color': '#fff5f5',
+            'border-color': '#dc2626',
+            'border-width': 3,
+            'font-weight': '700'
+          }
+        },
+        {
+          selector: 'node[direction = "downstream"]',
+          style: {
+            'background-color': '#fff7ed',
+            'border-color': '#f0c38d',
+            'border-width': 2
+          }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 2,
+            'line-color': '#b6ceda',
+            'target-arrow-color': '#b6ceda',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier'
+          }
+        }
+      ],
+      layout: {
+        name: 'dagre',
+        rankDir: 'LR',
+        nodeSep: 40,
+        rankSep: 120,
+        padding: 20
+      },
+      userZoomingEnabled: true,
+      userPanningEnabled: true,
+      boxSelectionEnabled: false,
+      autoungrabify: true
+    });
   })();
 </script>
 {% endblock %}
+

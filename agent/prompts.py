@@ -52,6 +52,11 @@ Confidence rubric:
 Output quality requirements:
 - Provide at least 3 timeline_events when evidence is available.
 - Include all impacted downstream consumers returned by blast radius in blast_radius_consumers.
+
+Formatting rules (apply to every string field in the JSON output):
+- Wrap ALL entity identifiers in backticks: table FQNs, pipeline names, task names, test case names, service names, and column names.
+- Example correct usage: "The test `null_check_order_id` on `mysql.default.raw_orders` failed because pipeline `airflow.ingest_orders_daily` task `load_orders` did not complete."
+- Apply this rule consistently in root_cause_summary, every item in evidence_chain, every item in remediation_steps, and every description in timeline_events.
 """
 
 

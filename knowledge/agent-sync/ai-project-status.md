@@ -174,6 +174,7 @@ _(Update this section at the end of every working session with any decisions mad
 - Replaced placeholder README with full submission-ready documentation.
 - Added worker metrics exporter and app metrics aggregation so app `/metrics` includes worker runtime counters/histograms in multi-container execution.
 - Docker validation: `make dev`, `make migrate`, `make test` (`60 passed`), and `make lint` all succeeded.
+- Fixed lineage graph rendering bug in dashboard by adding `Handle` components and relative positioning for React Flow (DLD-029 Polish).
 
 ---
 
