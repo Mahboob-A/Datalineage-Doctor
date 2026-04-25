@@ -157,7 +157,7 @@
     }
 
     if (!raw.nodes || raw.nodes.length === 0) {
-      container.innerHTML = '<p style="text-align:center;color:#6b7c86;padding:2rem;">No lineage data available for this incident.</p>';
+      container.innerHTML = '<p style="text-align:center;color:#3d6b5e;padding:2rem;font-family:IBM Plex Mono,monospace;letter-spacing:0.1em;">— no lineage data —</p>';
       return;
     }
 
@@ -185,52 +185,58 @@
       elements: elements,
       style: [
         {
+          /* Default: upstream/context nodes — dark teal with neon green border */
           selector: 'node',
           style: {
-            'label': 'data(label)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'font-family': '"IBM Plex Sans", "Segoe UI", sans-serif',
-            'font-size': '12px',
-            'font-weight': '600',
-            'color': '#102a43',
-            'background-color': '#f0f7fa',
-            'border-color': '#b6ceda',
-            'border-width': 2,
-            'border-style': 'solid',
-            'width': 'label',
-            'height': 'label',
-            'padding': '14px',
-            'shape': 'round-rectangle',
-            'text-wrap': 'wrap',
-            'text-max-width': '140px'
+            'label':           'data(label)',
+            'text-valign':     'center',
+            'text-halign':     'center',
+            'font-family':     '"IBM Plex Mono", monospace',
+            'font-size':       '10px',
+            'font-weight':     '600',
+            'color':           '#c8f0e0',   /* mint-tinted white */
+            'background-color':'#060f1a',   /* near-black teal */
+            'border-color':    '#00ffaa',   /* neon green */
+            'border-width':    2,
+            'border-style':    'solid',
+            'width':           'label',
+            'height':          'label',
+            'padding':         '14px',
+            'shape':           'round-rectangle',
+            'text-wrap':       'wrap',
+            'text-max-width':  '150px'
           }
         },
         {
+          /* Root cause — hot pink glow */
           selector: 'node[direction = "root"]',
           style: {
-            'background-color': '#fff5f5',
-            'border-color': '#dc2626',
-            'border-width': 3,
-            'font-weight': '700'
+            'background-color': '#1a0412',  /* deep rose-black */
+            'border-color':     '#ff2d78',  /* hot pink */
+            'border-width':     3,
+            'color':            '#ff8ab3'   /* light pink text */
           }
         },
         {
+          /* Downstream impact — vivid purple */
           selector: 'node[direction = "downstream"]',
           style: {
-            'background-color': '#fff7ed',
-            'border-color': '#f0c38d',
-            'border-width': 2
+            'background-color': '#120a1e',  /* deep purple-black */
+            'border-color':     '#bf5af2',  /* vivid purple */
+            'border-width':     2,
+            'color':            '#d8aafc'   /* light purple text */
           }
         },
         {
+          /* Edges — neon green lines with arrows */
           selector: 'edge',
           style: {
-            'width': 2,
-            'line-color': '#b6ceda',
-            'target-arrow-color': '#b6ceda',
+            'width':              2,
+            'line-color':         '#00ffaa',
+            'target-arrow-color': '#00ffaa',
             'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier'
+            'curve-style':        'bezier',
+            'opacity':            0.75
           }
         }
       ],
