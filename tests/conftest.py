@@ -10,6 +10,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("OM_JWT_TOKEN", "test-token")
 
 from app.main import app  # noqa: E402
+from app.models.incident import ConfidenceLabel, IncidentStatus  # noqa: E402
 
 
 def _now():
@@ -23,8 +24,8 @@ class MockIncident:
     table_fqn: str
     test_case_fqn: str
     triggered_at: datetime
-    status: str
-    confidence_label: str
+    status: IncidentStatus
+    confidence_label: ConfidenceLabel
     confidence_score: float
     evidence_chain: list[str]
     remediation_steps: list[str]
@@ -59,8 +60,8 @@ def mock_list_incidents_result():
             table_fqn="mysql.default.raw_orders",
             test_case_fqn="null_check_order_id",
             triggered_at=_now(),
-            status="COMPLETE",
-            confidence_label="HIGH",
+            status=IncidentStatus.COMPLETE,
+            confidence_label=ConfidenceLabel.HIGH,
             confidence_score=0.9,
             evidence_chain=["evidence"],
             remediation_steps=["step"],
@@ -78,8 +79,8 @@ def mock_detail_result():
         table_fqn="mysql.default.raw_orders",
         test_case_fqn="null_check_order_id",
         triggered_at=_now(),
-        status="COMPLETE",
-        confidence_label="HIGH",
+        status=IncidentStatus.COMPLETE,
+        confidence_label=ConfidenceLabel.HIGH,
         confidence_score=0.9,
         evidence_chain=["evidence"],
         remediation_steps=["step"],
@@ -114,7 +115,9 @@ def client(mock_list_incidents_result, mock_detail_result):
         return mock_list_incidents_result
     
     async def mock_detail(db, incident_id):
-        return mock_detail_result
+        if incident_id == "00000000-0000-0000-0000-000000000123":
+            return mock_detail_result
+        return None
     
     # Patch at the dashboard router level where the functions are used
     with patch("app.routers.dashboard.list_incidents", mock_list):

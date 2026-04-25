@@ -1,7 +1,7 @@
 .PHONY: dev stop clean migrate migrate-om test lint demo logs shell
 
 dev:
-	docker compose up --build -d
+	docker compose up -d --build
 
 stop:
 	docker compose stop
@@ -29,3 +29,9 @@ shell:
 
 demo:
 	@echo "Seed + trigger flow - implemented in Sprint 4"
+
+prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --pull always
+
+prod-down:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down

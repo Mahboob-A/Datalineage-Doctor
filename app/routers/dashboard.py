@@ -26,8 +26,9 @@ async def dashboard(
 ) -> HTMLResponse:
     incidents = await list_incidents(db, page=page, page_size=page_size)
     return templates.TemplateResponse(
-        "incidents_list.html",
-        {
+        request=request,
+        name="incidents_list.html",
+        context={
             "request": request,
             "incidents": incidents,
             "page": page,
@@ -47,8 +48,9 @@ async def incident_detail(
     incident, timeline_events, blast_radius = detail
     graph_data = build_graph_data(incident, timeline_events, blast_radius)
     return templates.TemplateResponse(
-        "incident_detail.html",
-        {
+        request=request,
+        name="incident_detail.html",
+        context={
             "request": request,
             "incident": incident,
             "timeline_events": timeline_events,

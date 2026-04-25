@@ -30,6 +30,7 @@ dev = [
   "anyio>=4.6",
   "ruff>=0.7",
   "respx>=0.23.1",
+  "watchfiles>=0.21",
 ]
 
 [tool.pytest.ini_options]
