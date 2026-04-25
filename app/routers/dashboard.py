@@ -1,6 +1,8 @@
 import asyncio
 import sys
+from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -19,6 +21,21 @@ from app.services.incident_store import (
 
 router = APIRouter(tags=["dashboard"])
 templates = Jinja2Templates(directory="dashboard/templates")
+
+def format_datetime_ist(dt: datetime | str | None) -> str:
+    if not dt:
+        return ""
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except ValueError:
+            return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    dt_ist = dt.astimezone(ZoneInfo("Asia/Kolkata"))
+    return dt_ist.strftime("%d-%m-%Y %H:%M")
+
+templates.env.filters["format_datetime_ist"] = format_datetime_ist
 
 
 @router.get("/", response_class=HTMLResponse)

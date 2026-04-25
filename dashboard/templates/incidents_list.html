@@ -26,7 +26,7 @@
         <div class="primary-text">{{ incident.table_fqn }}</div>
         <div class="secondary-text">{{ incident.test_case_fqn }}</div>
       </td>
-      <td>{{ incident.triggered_at }}</td>
+      <td>{{ incident.triggered_at | format_datetime_ist }}</td>
       <td>
         <span class="badge status-{{ incident.status.value.lower() }}">
           {% if incident.status.value.lower() == "processing" %}

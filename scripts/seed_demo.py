@@ -27,8 +27,65 @@ OMClient = importlib.import_module("om_client.client").OMClient
 
 logger = structlog.get_logger(__name__)
 
-PIPELINE_FQN = "airflow.ingest_orders_daily"
 PIPELINE_FAILED_AT_MS = int(datetime(2026, 4, 20, 3, 0, tzinfo=UTC).timestamp() * 1000)
+
+PIPELINES = {
+    "airflow.ingest_orders_daily": {
+        "name": "ingest_orders_daily",
+        "service": "airflow",
+        "tasks": [{"name": "extract_orders"}, {"name": "load_orders"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Failed",
+        "task_status": [
+            {"name": "extract_orders", "executionStatus": "Successful"},
+            {"name": "load_orders", "executionStatus": "Failed"},
+        ],
+    },
+    "airflow.ingest_products_daily": {
+        "name": "ingest_products_daily",
+        "service": "airflow",
+        "tasks": [{"name": "extract_products"}, {"name": "load_products"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Successful",
+        "task_status": [
+            {"name": "extract_products", "executionStatus": "Successful"},
+            {"name": "load_products", "executionStatus": "Successful"},
+        ],
+    },
+    "airflow.dbt_transform_daily": {
+        "name": "dbt_transform_daily",
+        "service": "airflow",
+        "tasks": [{"name": "run_stg"}, {"name": "run_fct"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Failed",
+        "task_status": [
+            {"name": "run_stg", "executionStatus": "Successful"},
+            {"name": "run_fct", "executionStatus": "Failed"},
+        ],
+    },
+    "airflow.ingest_users_hourly": {
+        "name": "ingest_users_hourly",
+        "service": "airflow",
+        "tasks": [{"name": "extract_users"}, {"name": "load_users"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Failed",
+        "task_status": [
+            {"name": "extract_users", "executionStatus": "Successful"},
+            {"name": "load_users", "executionStatus": "Failed"},
+        ],
+    },
+    "airflow.ingest_subs_daily": {
+        "name": "ingest_subs_daily",
+        "service": "airflow",
+        "tasks": [{"name": "extract_subs"}, {"name": "load_subs"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Successful",
+        "task_status": [
+            {"name": "extract_subs", "executionStatus": "Successful"},
+            {"name": "load_subs", "executionStatus": "Successful"},
+        ],
+    },
+}
 
 TABLES = {
     "mysql.default.raw_orders": [
@@ -57,6 +114,30 @@ TABLES = {
         {"name": "order_date", "dataType": "DATE"},
         {"name": "daily_revenue", "dataType": "DECIMAL"},
     ],
+    "mysql.default.users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+        {"name": "created_at", "dataType": "TIMESTAMP"},
+    ],
+    "mysql.default.subscriptions": [
+        {"name": "sub_id", "dataType": "INT"},
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "status", "dataType": "VARCHAR", "dataLength": 50},
+    ],
+    "dbt.default.stg_users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+    ],
+    "dbt.default.stg_subs": [
+        {"name": "sub_id", "dataType": "INT"},
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "status", "dataType": "VARCHAR", "dataLength": 50},
+    ],
+    "dbt.default.dim_users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+        {"name": "is_active_sub", "dataType": "BOOLEAN"},
+    ],
 }
 
 DASHBOARDS = {
@@ -64,17 +145,32 @@ DASHBOARDS = {
         "name": "revenue_dashboard",
         "service": "metabase",
         "description": "Revenue trends powered by fct_orders and fct_revenue.",
-    }
+    },
+    "metabase.user_growth_dashboard": {
+        "name": "user_growth_dashboard",
+        "service": "metabase",
+        "description": "User growth and active subscriptions powered by dim_users.",
+    },
 }
 
 LINEAGE_EDGES = [
     ("pipeline", "airflow.ingest_orders_daily", "table", "mysql.default.raw_orders"),
+    ("pipeline", "airflow.ingest_products_daily", "table", "mysql.default.raw_products"),
     ("table", "mysql.default.raw_orders", "table", "dbt.default.stg_orders"),
     ("table", "mysql.default.raw_products", "table", "dbt.default.stg_products"),
+    ("pipeline", "airflow.dbt_transform_daily", "table", "dbt.default.stg_orders"),
+    ("pipeline", "airflow.dbt_transform_daily", "table", "dbt.default.stg_products"),
     ("table", "dbt.default.stg_orders", "table", "dbt.default.fct_orders"),
     ("table", "dbt.default.stg_products", "table", "dbt.default.fct_revenue"),
     ("table", "dbt.default.fct_orders", "table", "dbt.default.fct_revenue"),
     ("table", "dbt.default.fct_orders", "dashboard", "metabase.revenue_dashboard"),
+    ("pipeline", "airflow.ingest_users_hourly", "table", "mysql.default.users"),
+    ("pipeline", "airflow.ingest_subs_daily", "table", "mysql.default.subscriptions"),
+    ("table", "mysql.default.users", "table", "dbt.default.stg_users"),
+    ("table", "mysql.default.subscriptions", "table", "dbt.default.stg_subs"),
+    ("table", "dbt.default.stg_users", "table", "dbt.default.dim_users"),
+    ("table", "dbt.default.stg_subs", "table", "dbt.default.dim_users"),
+    ("table", "dbt.default.dim_users", "dashboard", "metabase.user_growth_dashboard"),
 ]
 
 TEST_CASES = [
@@ -97,6 +193,41 @@ TEST_CASES = [
         "name": "freshness_check",
         "table_fqn": "dbt.default.fct_revenue",
         "test_definition": "tableLastModifiedTimeToBeBetween",
+    },
+    {
+        "name": "null_check_product_id",
+        "table_fqn": "mysql.default.raw_products",
+        "test_definition": "columnValuesToBeNotNull",
+    },
+    {
+        "name": "freshness_check_products",
+        "table_fqn": "dbt.default.stg_products",
+        "test_definition": "tableLastModifiedTimeToBeBetween",
+    },
+    {
+        "name": "anomaly_detection_revenue",
+        "table_fqn": "dbt.default.fct_revenue",
+        "test_definition": "tableRowCountToBeBetween",
+    },
+    {
+        "name": "null_check_user_id",
+        "table_fqn": "mysql.default.users",
+        "test_definition": "columnValuesToBeNotNull",
+    },
+    {
+        "name": "duplicate_subs",
+        "table_fqn": "mysql.default.subscriptions",
+        "test_definition": "columnValuesToBeUnique",
+    },
+    {
+        "name": "row_count_dim_users",
+        "table_fqn": "dbt.default.dim_users",
+        "test_definition": "tableRowCountToBeBetween",
+    },
+    {
+        "name": "anomaly_detection_growth",
+        "table_fqn": "dbt.default.dim_users",
+        "test_definition": "tableRowCountToBeBetween",
     },
 ]
 
@@ -527,45 +658,46 @@ async def _ensure_dashboards(om: OMClient, summary: dict[str, int]) -> None:
 
 
 async def _ensure_pipeline(om: OMClient, summary: dict[str, int]) -> None:
-    get_path = f"/pipelines/name/{quote(PIPELINE_FQN, safe='')}?fields=tasks"
-    payload = {
-        "name": "ingest_orders_daily",
-        "service": "airflow",
-        "tasks": [{"name": "extract_orders"}, {"name": "load_orders"}],
-    }
-    try:
-        existing = await om._get(get_path)
-    except httpx.HTTPError as exc:
-        summary["failed"] += 1
-        logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=PIPELINE_FQN, error=str(exc))
-        return
+    for pipeline_fqn, config in PIPELINES.items():
+        get_path = f"/pipelines/name/{quote(pipeline_fqn, safe='')}?fields=tasks"
+        payload = {
+            "name": config["name"],
+            "service": config["service"],
+            "tasks": config["tasks"],
+        }
+        try:
+            existing = await om._get(get_path)
+        except httpx.HTTPError as exc:
+            summary["failed"] += 1
+            logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=pipeline_fqn, error=str(exc))
+            continue
 
-    has_tasks = isinstance(existing.get("tasks"), list) and len(existing["tasks"]) > 0
-    if existing.get("found", True) and has_tasks:
-        summary["existing"] += 1
-        logger.info("seed_pipeline_exists", pipeline_fqn=PIPELINE_FQN)
-        return
+        has_tasks = isinstance(existing.get("tasks"), list) and len(existing["tasks"]) > 0
+        if existing.get("found", True) and has_tasks:
+            summary["existing"] += 1
+            logger.info("seed_pipeline_exists", pipeline_fqn=pipeline_fqn)
+            continue
 
-    try:
-        response = await _put_json(om, "/pipelines", payload)
-        body = response.json()
-    except httpx.HTTPStatusError as exc:
-        summary["failed"] += 1
-        logger.warning(
-            "seed_pipeline_upsert_failed",
-            pipeline_fqn=PIPELINE_FQN,
-            status_code=exc.response.status_code if exc.response is not None else None,
-            error=str(exc),
-        )
-        return
+        try:
+            response = await _put_json(om, "/pipelines", payload)
+            body = response.json()
+        except httpx.HTTPStatusError as exc:
+            summary["failed"] += 1
+            logger.warning(
+                "seed_pipeline_upsert_failed",
+                pipeline_fqn=pipeline_fqn,
+                status_code=exc.response.status_code if exc.response is not None else None,
+                error=str(exc),
+            )
+            continue
 
-    if isinstance(body, dict) and body.get("found") is False:
-        summary["failed"] += 1
-        logger.warning("seed_pipeline_upsert_not_found", pipeline_fqn=PIPELINE_FQN)
-        return
+        if isinstance(body, dict) and body.get("found") is False:
+            summary["failed"] += 1
+            logger.warning("seed_pipeline_upsert_not_found", pipeline_fqn=pipeline_fqn)
+            continue
 
-    summary["created"] += 1
-    logger.info("seed_pipeline_upserted", pipeline_fqn=PIPELINE_FQN)
+        summary["created"] += 1
+        logger.info("seed_pipeline_upserted", pipeline_fqn=pipeline_fqn)
 
 
 async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
@@ -685,69 +817,67 @@ async def _ensure_lineage(om: OMClient, summary: dict[str, int]) -> None:
 
 
 async def _ensure_pipeline_status(om: OMClient, summary: dict[str, int]) -> None:
-    try:
-        pipeline = await om._get(
-            f"/pipelines/name/{quote(PIPELINE_FQN, safe='')}",
-            params={"fields": "pipelineStatus"},
-        )
-    except httpx.HTTPError as exc:
-        summary["failed"] += 1
-        logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=PIPELINE_FQN, error=str(exc))
-        return
+    for pipeline_fqn, config in PIPELINES.items():
+        try:
+            pipeline = await om._get(
+                f"/pipelines/name/{quote(pipeline_fqn, safe='')}",
+                params={"fields": "pipelineStatus"},
+            )
+        except httpx.HTTPError as exc:
+            summary["failed"] += 1
+            logger.warning("seed_pipeline_lookup_failed", pipeline_fqn=pipeline_fqn, error=str(exc))
+            continue
 
-    if not pipeline.get("found", True):
-        summary["failed"] += 1
-        logger.warning("seed_pipeline_missing", pipeline_fqn=PIPELINE_FQN)
-        return
+        if not pipeline.get("found", True):
+            summary["failed"] += 1
+            logger.warning("seed_pipeline_missing", pipeline_fqn=pipeline_fqn)
+            continue
 
-    status_payload = {
-        "timestamp": PIPELINE_FAILED_AT_MS,
-        "executionStatus": "Failed",
-        "taskStatus": [
-            {"name": "extract_orders", "executionStatus": "Successful"},
-            {"name": "load_orders", "executionStatus": "Failed"},
-        ],
-    }
-    status_path = f"/pipelines/{quote(PIPELINE_FQN, safe='')}/status"
-    latest_status = _extract_latest_pipeline_status(pipeline.get("pipelineStatus"))
+        status_payload = {
+            "timestamp": config["status_timestamp"],
+            "executionStatus": config["execution_status"],
+            "taskStatus": config["task_status"],
+        }
+        status_path = f"/pipelines/{quote(pipeline_fqn, safe='')}/status"
+        latest_status = _extract_latest_pipeline_status(pipeline.get("pipelineStatus"))
 
-    if _pipeline_status_matches(
-        latest_status,
-        timestamp=PIPELINE_FAILED_AT_MS,
-        execution_status="Failed",
-    ):
-        summary["existing"] += 1
-        logger.info(
-            "seed_pipeline_status_exists",
-            pipeline_fqn=PIPELINE_FQN,
-            timestamp=PIPELINE_FAILED_AT_MS,
-        )
-        return
-
-    try:
-        await _put_json(om, status_path, status_payload)
-        summary["created"] += 1
-        logger.info(
-            "seed_pipeline_status_created",
-            pipeline_fqn=PIPELINE_FQN,
-            timestamp=PIPELINE_FAILED_AT_MS,
-        )
-    except httpx.HTTPStatusError as exc:
-        if exc.response is not None and exc.response.status_code == 409:
+        if _pipeline_status_matches(
+            latest_status,
+            timestamp=config["status_timestamp"],
+            execution_status=config["execution_status"],
+        ):
             summary["existing"] += 1
             logger.info(
                 "seed_pipeline_status_exists",
-                pipeline_fqn=PIPELINE_FQN,
-                timestamp=PIPELINE_FAILED_AT_MS,
+                pipeline_fqn=pipeline_fqn,
+                timestamp=config["status_timestamp"],
             )
-            return
-        summary["failed"] += 1
-        logger.warning(
-            "seed_pipeline_status_failed",
-            pipeline_fqn=PIPELINE_FQN,
-            status_code=exc.response.status_code if exc.response is not None else None,
-            error=str(exc),
-        )
+            continue
+
+        try:
+            await _put_json(om, status_path, status_payload)
+            summary["created"] += 1
+            logger.info(
+                "seed_pipeline_status_created",
+                pipeline_fqn=pipeline_fqn,
+                timestamp=config["status_timestamp"],
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code == 409:
+                summary["existing"] += 1
+                logger.info(
+                    "seed_pipeline_status_exists",
+                    pipeline_fqn=pipeline_fqn,
+                    timestamp=config["status_timestamp"],
+                )
+                continue
+            summary["failed"] += 1
+            logger.warning(
+                "seed_pipeline_status_failed",
+                pipeline_fqn=pipeline_fqn,
+                status_code=exc.response.status_code if exc.response is not None else None,
+                error=str(exc),
+            )
 
 
 async def _ensure_test_cases(om: OMClient, summary: dict[str, int]) -> None:
