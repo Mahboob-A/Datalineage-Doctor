@@ -250,6 +250,16 @@ tbody tr:hover {
   color: #6b7c86;
 }
 
+.inline-code {
+  font-family: "IBM Plex Mono", "Fira Code", "Courier New", monospace;
+  font-size: 0.875em;
+  background: #e6f2f5;
+  color: #0b3c49;
+  border: 1px solid #b6ceda;
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+}
+
 .confidence-ring {
   width: 110px;
   height: 110px;
@@ -286,43 +296,12 @@ tbody tr:hover {
 }
 
 .lineage-graph {
+  position: relative;
   height: 360px;
   width: 100%;
   border-radius: 16px;
   background: #f8fafc;
   border: 1px dashed #d3dde6;
-}
-
-.node-card {
-  background: #ffffff;
-  border-radius: 12px;
-  border: 2px solid #d3dde6;
-  padding: 0.5rem 0.7rem;
-  min-width: 140px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-}
-
-.node-card.downstream {
-  border-color: #f0c38d;
-  background: #fff7ed;
-}
-
-.node-card.upstream {
-  border-color: #b6ceda;
-  background: #f0f7fa;
-}
-
-.node-card.root {
-  border-color: #dc2626;
-}
-
-.node-label {
-  font-weight: 700;
-}
-
-.node-meta {
-  font-size: 0.75rem;
-  color: #6b7c86;
 }
 
 .detail-split {
