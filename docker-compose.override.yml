@@ -15,7 +15,7 @@ services:
     volumes:
       - .:/app
       - app_venv:/app/.venv
-    command: uv run celery -A worker.celery_app worker --loglevel=info
+    command: uv run celery -A worker.celery_app worker --loglevel=info --pool=solo
 
 volumes:
   app_venv:

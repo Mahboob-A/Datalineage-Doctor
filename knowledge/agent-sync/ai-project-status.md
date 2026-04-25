@@ -48,6 +48,16 @@ DataLineage Doctor is a solo-built hackathon project for the OpenMetadata Hackat
 **Sprint 4 — Observability + Polish** (April 23–24)
 **Goal:** Grafana/Prometheus observability, one-command demo flow, and final polish.
 
+### Sprint 4 Ticket Status
+
+| Ticket | Title | Status |
+|---|---|---|
+| DLD-025 | Prometheus Metrics Instrumentation | ✅ Done |
+| DLD-026 | Grafana Dashboard | ✅ Done |
+| DLD-027 | make demo One-Command Flow | ✅ Done (implemented; environment auth blocks OM readiness check path) |
+| DLD-028 | README | ✅ Done |
+| DLD-029 | Final Integration + Submission Polish | 🔄 In Progress |
+
 ### Sprint 3 Ticket Status
 
 | Ticket | Title | Status |
@@ -102,13 +112,13 @@ Demo video recording, submission write-up, final README review.
 
 ## In Progress
 
-- Sprint 4 kickoff and execution.
+- Sprint 4 DLD-029 final closure.
 
 ---
 
 ## Blocked
 
-- No active project blockers at the Sprint 2 boundary.
+- `make demo` currently blocks in `scripts/wait_for_om.py` due repeated `401` on `http://openmetadata_server:8585/api/v1/system/status` in current environment.
 
 ---
 
@@ -156,6 +166,14 @@ _(Update this section at the end of every working session with any decisions mad
 - `uv run pytest tests -q` → `47 passed, 3 skipped, 1 warning`
 - `uv run ruff check . --fix` → all lint issues fixed
 - Sprint 3 progress documented in `knowledge/sprint-progress/sprint-3-progress.md`
+- Sprint 4 implementation executed via `agent-plan-sprint-4-1`.
+- Added Prometheus + Grafana services and provisioning with dashboard JSON.
+- Implemented Sprint 4 metrics instrumentation across worker/tasks, agent loop, and tool dispatch.
+- Added wait scripts (`scripts/wait_for_om.py`, `scripts/wait_for_incident.py`) and `make demo` flow.
+- Added `GET /api/incidents/latest` for demo polling.
+- Replaced placeholder README with full submission-ready documentation.
+- Added worker metrics exporter and app metrics aggregation so app `/metrics` includes worker runtime counters/histograms in multi-container execution.
+- Docker validation: `make dev`, `make migrate`, `make test` (`60 passed`), and `make lint` all succeeded.
 
 ---
 

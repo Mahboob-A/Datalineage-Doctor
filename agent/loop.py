@@ -26,6 +26,7 @@ from agent.schemas.report import RCAReport
 from agent.tools.registry import RCA_TOOLS, dispatch_tool
 from app.config import settings
 from app.models import ConfidenceLabel, ToolCallLog
+from app.services.metrics import rca_errors_total
 
 logger = structlog.get_logger(__name__)
 
@@ -78,6 +79,30 @@ def _parse_tool_arguments(raw_arguments: object) -> tuple[dict[str, object], str
 
 def _tool_cache_key(tool_name: str, args: dict[str, object]) -> str:
     return f"{tool_name}:{json.dumps(args, sort_keys=True, default=str)}"
+
+
+def _is_om_api_server_error(tool_name: str, result: dict[str, object]) -> bool:
+    if tool_name not in {
+        "get_upstream_lineage",
+        "calculate_blast_radius",
+        "get_dq_test_results",
+        "get_pipeline_entity_status",
+        "get_entity_owners",
+    }:
+        return False
+
+    error_value = result.get("error")
+    if not isinstance(error_value, str):
+        return False
+
+    lowered = error_value.lower()
+    return (
+        "500" in lowered
+        or "502" in lowered
+        or "503" in lowered
+        or "504" in lowered
+        or "server error" in lowered
+    )
 
 
 def _extract_tool_calls(message: object) -> list[dict[str, object]]:
@@ -280,7 +305,22 @@ async def run_rca_agent(
                 tool_calls_made=tool_calls_made,
                 iteration=iteration + 1,
             )
-        except (APIConnectionError, APITimeoutError, APIError) as exc:
+        except APITimeoutError as exc:
+            logger.warning(
+                "rca_agent_llm_timeout",
+                table_fqn=table_fqn,
+                iteration=iteration,
+                error=str(exc),
+            )
+            rca_errors_total.labels(error_type="llm_timeout").inc()
+            return _build_fallback_report(
+                table_fqn=table_fqn,
+                triggered_at=triggered_at,
+                reason="LLM timeout after retries",
+                tool_calls_made=tool_calls_made,
+                iteration=iteration + 1,
+            )
+        except (APIConnectionError, APIError) as exc:
             logger.warning(
                 "rca_agent_llm_call_failed",
                 table_fqn=table_fqn,
@@ -400,6 +440,8 @@ async def run_rca_agent(
                     success = "error" not in result
                     error_message = str(result.get("error")) if not success else None
                     tool_result_cache[cache_key] = result
+                    if _is_om_api_server_error(tool_name, result):
+                        rca_errors_total.labels(error_type="om_api_error").inc()
 
                 await log_tool_call(
                     incident_id=incident_id,

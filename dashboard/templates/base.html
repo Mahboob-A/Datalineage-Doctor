@@ -11,17 +11,66 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" type="image/x-icon" href="/static/icon/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icon/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/icon/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icon/apple-touch-icon.png" />
+  <link rel="manifest" href="/static/icon/site.webmanifest" />
   </head>
   <body>
     <header class="header">
       <div class="container">
         <div class="brand">
-          <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
-            <rect x="3" y="8" width="42" height="32" rx="10" />
-            <path d="M14 28c4-8 9-12 15-12" />
-            <path d="M20 31c3-5 6-8 10-8" />
-            <circle cx="31" cy="18" r="3" />
-          </svg>
+      {# Old logo kept for reference
+      <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="3" y="8" width="42" height="32" rx="10" />
+        <path d="M14 28c4-8 9-12 15-12" />
+        <path d="M20 31c3-5 6-8 10-8" />
+        <circle cx="31" cy="18" r="3" />
+      </svg>
+      #}
+      {#
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="DataLineage Doctor logo">
+        <rect x="4" y="8" width="40" height="32" rx="9" fill="none" stroke="#0EA5E9" stroke-width="3"/>
+        <path d="M12 30 C17 22, 24 18, 34 18" fill="none" stroke="#0EA5E9" stroke-width="3" stroke-linecap="round"/>
+        <path d="M18 33 C21 28, 25 25, 30 25" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="34" cy="18" r="3" fill="#22C55E"/>
+      </svg>
+      #}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Metadata lineage style logo">
+        <defs>
+          <linearGradient id="omLikeGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#13B5EA"/>
+            <stop offset="100%" stop-color="#2D6CDF"/>
+          </linearGradient>
+          <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.4" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="32" cy="32" r="27" fill="none" stroke="url(#omLikeGrad)" stroke-width="3"/>
+        <g stroke="url(#omLikeGrad)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#softGlow)">
+          <path d="M18 20 L32 14 L46 20"/>
+          <path d="M18 44 L32 50 L46 44"/>
+          <path d="M18 20 L18 44"/>
+          <path d="M46 20 L46 44"/>
+          <path d="M32 14 L32 50"/>
+          <path d="M18 32 L46 32"/>
+        </g>
+
+        <g fill="#0B1220" stroke="url(#omLikeGrad)" stroke-width="2.4">
+          <circle cx="18" cy="20" r="4.2"/>
+          <circle cx="32" cy="14" r="4.2"/>
+          <circle cx="46" cy="20" r="4.2"/>
+          <circle cx="18" cy="44" r="4.2"/>
+          <circle cx="32" cy="50" r="4.2"/>
+          <circle cx="46" cy="44" r="4.2"/>
+          <circle cx="32" cy="32" r="5"/>
+        </g>
+      </svg>
           <div>
             <p class="brand-title">DataLineage Doctor</p>
             <p class="brand-subtitle">RCA dashboard</p>
@@ -29,7 +78,7 @@
         </div>
         <nav class="nav">
           <a href="/">Dashboard</a>
-          <a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/mahboob-a/Datalineage-Doctor/" target="_blank" rel="noreferrer">GitHub</a>
           <button class="theme-toggle" type="button" aria-label="Toggle theme" disabled>
             Theme
           </button>

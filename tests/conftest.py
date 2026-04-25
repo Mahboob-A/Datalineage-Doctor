@@ -118,8 +118,13 @@ def client(mock_list_incidents_result, mock_detail_result):
         if incident_id == "00000000-0000-0000-0000-000000000123":
             return mock_detail_result
         return None
+
+    async def mock_latest(db):
+        _ = db
+        return mock_list_incidents_result[0]
     
     # Patch at the dashboard router level where the functions are used
     with patch("app.routers.dashboard.list_incidents", mock_list):
         with patch("app.routers.dashboard.get_incident_detail", mock_detail):
-            yield TestClient(app)
+            with patch("app.routers.dashboard.latest_incident", mock_latest):
+                yield TestClient(app)

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from app.services.graph_builder import build_graph_data
 from app.services.incident_store import (
     get_incident_detail,
     group_blast_radius,
+    latest_incident,
     list_incidents,
 )
 
@@ -58,4 +59,23 @@ async def incident_detail(
             "blast_radius_grouped": group_blast_radius(blast_radius),
             "graph_data": graph_data,
         },
+    )
+
+
+@router.get("/api/incidents/latest")
+async def latest_incident_api(db: AsyncSession = Depends(get_db)) -> JSONResponse:
+    incident = await latest_incident(db)
+    if incident is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_found", "detail": "No incidents available"},
+        )
+
+    return JSONResponse(
+        content={
+            "incident_id": str(incident.id),
+            "status": incident.status.value,
+            "table_fqn": incident.table_fqn,
+            "test_case_fqn": incident.test_case_fqn,
+        }
     )

@@ -16,7 +16,7 @@ services:
 
   worker:
     image: ${APP_IMAGE:-datalineage-doctor:dev}
-    command: uv run celery -A worker.celery_app worker --loglevel=info
+    command: uv run celery -A worker.celery_app worker --loglevel=info --pool=solo
     env_file:
       - .env
     depends_on:
@@ -139,6 +139,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      app:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_started
 
 volumes:
   mysql_data:

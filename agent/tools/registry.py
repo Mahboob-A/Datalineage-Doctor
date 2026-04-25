@@ -5,6 +5,7 @@ from agent.tools.lineage import calculate_blast_radius, get_upstream_lineage
 from agent.tools.ownership import get_entity_owners
 from agent.tools.pipeline import get_pipeline_entity_status
 from agent.tools.quality import get_dq_test_results
+from app.services.metrics import rca_tool_calls_total
 
 logger = structlog.get_logger(__name__)
 
@@ -155,6 +156,7 @@ TOOL_HANDLERS = {
 
 async def dispatch_tool(tool_name: str, args: dict, db_session) -> dict:
     """Dispatch a named tool and return a structured result or error payload."""
+    rca_tool_calls_total.labels(tool_name=tool_name).inc()
     handler = TOOL_HANDLERS.get(tool_name)
     if handler is None:
         return {"error": f"Unknown tool: {tool_name}"}
