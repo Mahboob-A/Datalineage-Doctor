@@ -15,6 +15,10 @@ SCENARIOS = [
     {"name": "null_check_product_id", "fullyQualifiedName": "mysql.default.raw_products"},
     {"name": "freshness_check_products", "fullyQualifiedName": "dbt.default.stg_products"},
     {"name": "anomaly_detection_revenue", "fullyQualifiedName": "dbt.default.fct_revenue"},
+    {"name": "null_check_user_id", "fullyQualifiedName": "mysql.default.users"},
+    {"name": "duplicate_subs", "fullyQualifiedName": "mysql.default.subscriptions"},
+    {"name": "row_count_dim_users", "fullyQualifiedName": "dbt.default.dim_users"},
+    {"name": "anomaly_detection_growth", "fullyQualifiedName": "dbt.default.dim_users"},
 ]
 
 

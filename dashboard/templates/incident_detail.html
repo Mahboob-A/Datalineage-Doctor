@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">Incident detail</p>
     <h2>{{ incident.table_fqn }}</h2>
-    <p class="subtext">Triggered at {{ incident.triggered_at }}</p>
+    <p class="subtext">Triggered at {{ incident.triggered_at | format_datetime_ist }}</p>
   </div>
   <div class="detail-status">
     <span class="badge status-{{ incident.status.value.lower() }}">
@@ -82,7 +82,7 @@
         <div class="timeline-dot"></div>
         <div>
           <div class="timeline-title">{{ event.event_type }}</div>
-          <div class="timeline-meta">{{ event.occurred_at }} · {{ event.entity_fqn }}</div>
+          <div class="timeline-meta">{{ event.occurred_at | format_datetime_ist }} · {{ event.entity_fqn }}</div>
           <p class="timeline-desc">{{ event.description }}</p>
         </div>
       </li>

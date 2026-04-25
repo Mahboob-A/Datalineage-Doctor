@@ -63,6 +63,28 @@ PIPELINES = {
             {"name": "run_fct", "executionStatus": "Failed"},
         ],
     },
+    "airflow.ingest_users_hourly": {
+        "name": "ingest_users_hourly",
+        "service": "airflow",
+        "tasks": [{"name": "extract_users"}, {"name": "load_users"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Failed",
+        "task_status": [
+            {"name": "extract_users", "executionStatus": "Successful"},
+            {"name": "load_users", "executionStatus": "Failed"},
+        ],
+    },
+    "airflow.ingest_subs_daily": {
+        "name": "ingest_subs_daily",
+        "service": "airflow",
+        "tasks": [{"name": "extract_subs"}, {"name": "load_subs"}],
+        "status_timestamp": PIPELINE_FAILED_AT_MS,
+        "execution_status": "Successful",
+        "task_status": [
+            {"name": "extract_subs", "executionStatus": "Successful"},
+            {"name": "load_subs", "executionStatus": "Successful"},
+        ],
+    },
 }
 
 TABLES = {
@@ -92,6 +114,30 @@ TABLES = {
         {"name": "order_date", "dataType": "DATE"},
         {"name": "daily_revenue", "dataType": "DECIMAL"},
     ],
+    "mysql.default.users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+        {"name": "created_at", "dataType": "TIMESTAMP"},
+    ],
+    "mysql.default.subscriptions": [
+        {"name": "sub_id", "dataType": "INT"},
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "status", "dataType": "VARCHAR", "dataLength": 50},
+    ],
+    "dbt.default.stg_users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+    ],
+    "dbt.default.stg_subs": [
+        {"name": "sub_id", "dataType": "INT"},
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "status", "dataType": "VARCHAR", "dataLength": 50},
+    ],
+    "dbt.default.dim_users": [
+        {"name": "user_id", "dataType": "INT"},
+        {"name": "email", "dataType": "VARCHAR", "dataLength": 255},
+        {"name": "is_active_sub", "dataType": "BOOLEAN"},
+    ],
 }
 
 DASHBOARDS = {
@@ -99,7 +145,12 @@ DASHBOARDS = {
         "name": "revenue_dashboard",
         "service": "metabase",
         "description": "Revenue trends powered by fct_orders and fct_revenue.",
-    }
+    },
+    "metabase.user_growth_dashboard": {
+        "name": "user_growth_dashboard",
+        "service": "metabase",
+        "description": "User growth and active subscriptions powered by dim_users.",
+    },
 }
 
 LINEAGE_EDGES = [
@@ -113,6 +164,13 @@ LINEAGE_EDGES = [
     ("table", "dbt.default.stg_products", "table", "dbt.default.fct_revenue"),
     ("table", "dbt.default.fct_orders", "table", "dbt.default.fct_revenue"),
     ("table", "dbt.default.fct_orders", "dashboard", "metabase.revenue_dashboard"),
+    ("pipeline", "airflow.ingest_users_hourly", "table", "mysql.default.users"),
+    ("pipeline", "airflow.ingest_subs_daily", "table", "mysql.default.subscriptions"),
+    ("table", "mysql.default.users", "table", "dbt.default.stg_users"),
+    ("table", "mysql.default.subscriptions", "table", "dbt.default.stg_subs"),
+    ("table", "dbt.default.stg_users", "table", "dbt.default.dim_users"),
+    ("table", "dbt.default.stg_subs", "table", "dbt.default.dim_users"),
+    ("table", "dbt.default.dim_users", "dashboard", "metabase.user_growth_dashboard"),
 ]
 
 TEST_CASES = [
@@ -149,6 +207,26 @@ TEST_CASES = [
     {
         "name": "anomaly_detection_revenue",
         "table_fqn": "dbt.default.fct_revenue",
+        "test_definition": "tableRowCountToBeBetween",
+    },
+    {
+        "name": "null_check_user_id",
+        "table_fqn": "mysql.default.users",
+        "test_definition": "columnValuesToBeNotNull",
+    },
+    {
+        "name": "duplicate_subs",
+        "table_fqn": "mysql.default.subscriptions",
+        "test_definition": "columnValuesToBeUnique",
+    },
+    {
+        "name": "row_count_dim_users",
+        "table_fqn": "dbt.default.dim_users",
+        "test_definition": "tableRowCountToBeBetween",
+    },
+    {
+        "name": "anomaly_detection_growth",
+        "table_fqn": "dbt.default.dim_users",
         "test_definition": "tableRowCountToBeBetween",
     },
 ]
