@@ -24,3 +24,22 @@ def test_dashboard_detail_404(client):
         headers={"accept": "text/html"},
     )
     assert response.status_code == 404
+
+
+def test_latest_incident_api(client):
+    response = client.get("/api/incidents/latest")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "COMPLETE"
+    assert payload["table_fqn"] == "mysql.default.raw_orders"
+
+
+def test_latest_incident_api_not_found(client, monkeypatch):
+    async def _missing_incident(db):
+        _ = db
+        return None
+
+    monkeypatch.setattr("app.routers.dashboard.latest_incident", _missing_incident)
+    response = client.get("/api/incidents/latest")
+    assert response.status_code == 404
+    assert response.json()["error"] == "not_found"

@@ -289,3 +289,85 @@ async def test_run_rca_agent_caches_duplicate_tool_calls(monkeypatch):
     second_tool_response = captured_messages[2][-1]
     assert second_tool_response["role"] == "tool"
     assert "Identical tool call already ran" in second_tool_response["content"]
+
+
+@pytest.mark.asyncio
+async def test_run_rca_agent_increments_llm_timeout_metric(monkeypatch):
+    metric_calls: list[str] = []
+
+    class _Counter:
+        def __init__(self, error_type: str) -> None:
+            self.error_type = error_type
+
+        def inc(self) -> None:
+            metric_calls.append(self.error_type)
+
+    class _Metric:
+        def labels(self, **kwargs):
+            return _Counter(kwargs["error_type"])
+
+    async def fake_call_llm(*, client, messages):
+        _ = (client, messages)
+        from openai import APITimeoutError
+
+        raise APITimeoutError(request=None)
+
+    monkeypatch.setattr("agent.loop.call_llm", fake_call_llm)
+    monkeypatch.setitem(run_rca_agent.__globals__, "rca_errors_total", _Metric())
+
+    report = await run_rca_agent(
+        table_fqn="mysql.default.raw_orders",
+        test_case_fqn="orders_row_count_check",
+        triggered_at="2026-04-20T10:00:00+00:00",
+        db_session=None,
+    )
+
+    assert report.confidence_label == ConfidenceLabel.LOW
+    assert metric_calls == ["llm_timeout"]
+
+
+@pytest.mark.asyncio
+async def test_run_rca_agent_increments_om_api_error_metric(monkeypatch):
+    call_sequence = [
+        _tool_call_response(
+            "get_upstream_lineage", {"table_fqn": "mysql.default.raw_orders"}
+        ),
+        _stop_response(_report_content(confidence_score=0.9, confidence_label="LOW")),
+    ]
+    metric_calls: list[str] = []
+
+    class _Counter:
+        def __init__(self, error_type: str) -> None:
+            self.error_type = error_type
+
+        def inc(self) -> None:
+            metric_calls.append(self.error_type)
+
+    class _Metric:
+        def labels(self, **kwargs):
+            return _Counter(kwargs["error_type"])
+
+    async def fake_call_llm(*, client, messages):
+        _ = (client, messages)
+        return call_sequence.pop(0)
+
+    async def fake_dispatch_tool(tool_name: str, args: dict, db_session):
+        _ = (tool_name, args, db_session)
+        return {
+            "error": "Server error '500 Internal Server Error' for url 'http://om/api'",
+            "tool": "get_upstream_lineage",
+        }
+
+    monkeypatch.setattr("agent.loop.call_llm", fake_call_llm)
+    monkeypatch.setattr("agent.loop.dispatch_tool", fake_dispatch_tool)
+    monkeypatch.setitem(run_rca_agent.__globals__, "rca_errors_total", _Metric())
+
+    report = await run_rca_agent(
+        table_fqn="mysql.default.raw_orders",
+        test_case_fqn="orders_row_count_check",
+        triggered_at="2026-04-20T10:00:00+00:00",
+        db_session=None,
+    )
+
+    assert report.confidence_label == ConfidenceLabel.HIGH
+    assert metric_calls == ["om_api_error"]

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-label="DataLineage Doctor dashboard overview">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f3f7ff"/>
+      <stop offset="100%" stop-color="#e7f5ee"/>
+    </linearGradient>
+    <style>
+      .title { font: 700 34px 'Avenir Next', 'Segoe UI', sans-serif; fill: #102a43; }
+      .sub { font: 500 16px 'Avenir Next', 'Segoe UI', sans-serif; fill: #334e68; }
+      .label { font: 700 14px 'Avenir Next', 'Segoe UI', sans-serif; fill: #486581; }
+      .val { font: 700 20px 'Avenir Next', 'Segoe UI', sans-serif; fill: #102a43; }
+      .mono { font: 600 13px 'Menlo', 'SFMono-Regular', monospace; fill: #243b53; }
+      .small { font: 500 12px 'Avenir Next', 'Segoe UI', sans-serif; fill: #627d98; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="760" fill="url(#bg)"/>
+  <rect x="32" y="24" width="1336" height="712" rx="16" fill="#ffffff" stroke="#d9e2ec"/>
+
+  <text x="64" y="76" class="title">DataLineage Doctor - Incident Detail</text>
+  <text x="64" y="104" class="sub">Root cause analysis report with timeline, blast radius, and lineage graph</text>
+
+  <rect x="64" y="132" width="260" height="92" rx="12" fill="#f0f4f8"/>
+  <text x="84" y="162" class="label">Status</text>
+  <text x="84" y="192" class="val">COMPLETE</text>
+
+  <rect x="344" y="132" width="260" height="92" rx="12" fill="#f0f4f8"/>
+  <text x="364" y="162" class="label">Confidence</text>
+  <text x="364" y="192" class="val">0.91 (HIGH)</text>
+
+  <rect x="624" y="132" width="260" height="92" rx="12" fill="#f0f4f8"/>
+  <text x="644" y="162" class="label">Blast Radius</text>
+  <text x="644" y="192" class="val">4 Consumers</text>
+
+  <rect x="904" y="132" width="400" height="92" rx="12" fill="#f0f4f8"/>
+  <text x="924" y="162" class="label">Failing Table</text>
+  <text x="924" y="192" class="mono">mysql.default.raw_orders</text>
+
+  <rect x="64" y="248" width="620" height="456" rx="12" fill="#f8fafc" stroke="#d9e2ec"/>
+  <text x="84" y="280" class="label">Lineage Graph</text>
+
+  <rect x="110" y="330" width="180" height="56" rx="10" fill="#ffd5d5" stroke="#f97066"/>
+  <text x="126" y="362" class="small">raw_orders (root cause)</text>
+
+  <rect x="366" y="330" width="180" height="56" rx="10" fill="#e6f6ff" stroke="#4dabf7"/>
+  <text x="386" y="362" class="small">stg_orders</text>
+
+  <rect x="366" y="430" width="180" height="56" rx="10" fill="#e6f6ff" stroke="#4dabf7"/>
+  <text x="386" y="462" class="small">fct_orders</text>
+
+  <rect x="366" y="530" width="180" height="56" rx="10" fill="#fff3bf" stroke="#fcc419"/>
+  <text x="386" y="562" class="small">revenue_dashboard</text>
+
+  <line x1="290" y1="358" x2="366" y2="358" stroke="#334e68" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="456" y1="386" x2="456" y2="430" stroke="#334e68" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="456" y1="486" x2="456" y2="530" stroke="#334e68" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="708" y="248" width="596" height="220" rx="12" fill="#f8fafc" stroke="#d9e2ec"/>
+  <text x="728" y="280" class="label">Timeline</text>
+  <text x="728" y="315" class="small">1. Pipeline ingest_orders_daily failed</text>
+  <text x="728" y="343" class="small">2. raw_orders ingestion produced null order_id values</text>
+  <text x="728" y="371" class="small">3. null_check_order_id test failed on raw_orders</text>
+  <text x="728" y="399" class="small">4. downstream marts consumed stale data</text>
+
+  <rect x="708" y="484" width="596" height="220" rx="12" fill="#f8fafc" stroke="#d9e2ec"/>
+  <text x="728" y="516" class="label">Remediation Steps</text>
+  <text x="728" y="551" class="small">- Re-run pipeline task and validate ingestion logs</text>
+  <text x="728" y="579" class="small">- Backfill raw_orders for affected window</text>
+  <text x="728" y="607" class="small">- Rebuild dependent dbt models and refresh dashboard extracts</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#334e68"/>
+    </marker>
+  </defs>
+</svg>
