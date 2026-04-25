@@ -190,6 +190,7 @@ dev = [
     { name = "pytest-mock" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "watchfiles" },
 ]
 
 [package.metadata]
@@ -219,6 +220,7 @@ dev = [
     { name = "pytest-mock", specifier = ">=3.14" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff", specifier = ">=0.7" },
+    { name = "watchfiles", specifier = ">=0.21" },
 ]
 
 [[package]]

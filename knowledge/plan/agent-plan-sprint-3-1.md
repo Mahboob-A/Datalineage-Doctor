@@ -41,15 +41,14 @@ Before starting any sprint, the agent must do this in order:
 - knowledge/plan/agent-plan-sprint-2-1.md
 
 ## Current State Snapshot
-- Current sprint in status file: Sprint 2 (still marked in progress).
+- Current sprint in status file: Sprint 2 completed.
 - Sprint 1 status: complete.
-- Sprint 2 progress file shows planning/setup and active implementation wave.
-- Main goal now: execute Sprint 3 deliverables for demo-ready dashboard detail + notifications while preserving locked architecture and scope.
+- Main goal now: execute Sprint 3 deliverables for hackathon-demo-ready dashboard detail + notifications while preserving locked architecture and scope.
 
 ## Sprint 3 Goal
 Deliver a polished incident detail experience and complete post-RCA notification loop:
 - Incident detail page with React Flow lineage graph and complete RCA sections.
-- Slack notification after RCA completion.
+- Slack notification after RCA completion. (ASK THE USER WHAT CONFIG/CREDENTIALS NEEDED FOR SLACK NOTIFICATION, AND HOW AND WHERE TO SAVE IT/THEM).
 - OpenMetadata incident creation after RCA completion.
 - Dashboard polish for demo-grade UX and error states.
 - End-to-end integration path validated.
@@ -65,8 +64,7 @@ Deliver a polished incident detail experience and complete post-RCA notification
 ## Execution Plan (Ticket Order)
 
 ### Wave A (blocking foundation)
-1. Sprint 2 closure gate (DoD + traceability complete before Sprint 3 coding).
-2. DLD-020 Incident Detail Page (`GET /incidents/{id}`, detail template, graph builder).
+See `knowledge/sprint-progress/sprint-2-progress.md` for the sprint 2 update/blocking.
 
 ### Wave B (parallelizable after Wave A)
 1. DLD-021 Slack Notification.
@@ -116,6 +114,7 @@ Sprint 3 is complete only if all pass:
 ## Post-Sprint Traceability Update (mandatory)
 After Sprint 3 completes:
 1. Update `knowledge/sprint-tickets/sprint-3.md` with section:
+2. Update `knowledge/sprint-progress/sprint-3-progress.md` with section:
 
 ### Agent Plan Traceability
 - Plan ID: agent-plan-sprint-3-1

@@ -1,30 +1,26 @@
-"""
-Dashboard tests.
-
-Note: The template rendering tests require the full Docker stack running
-because they depend on database access and template compilation caching.
-These tests are integration tests that should be run with `make test` after
-`make dev` has started the stack.
-
-Unit tests for the dashboard are limited to API contract verification.
-"""
-
-import pytest
+"""Dashboard route rendering tests (with mocked DB access)."""
 
 
-@pytest.mark.skip(reason="Requires full Docker stack with database running")
-def test_dashboard_list_renders():
-    """Test that the dashboard list page renders with incidents."""
-    pass
+def test_dashboard_list_renders(client):
+    response = client.get("/", headers={"accept": "text/html"})
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "mysql.default.raw_orders" in response.text
 
 
-@pytest.mark.skip(reason="Requires full Docker stack with database running")
-def test_dashboard_detail_renders():
-    """Test that the incident detail page renders."""
-    pass
+def test_dashboard_detail_renders(client):
+    response = client.get(
+        "/incidents/00000000-0000-0000-0000-000000000123",
+        headers={"accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "mysql.default.raw_orders" in response.text
 
 
-@pytest.mark.skip(reason="Requires full Docker stack with database running")
-def test_dashboard_detail_404():
-    """Test that a non-existent incident returns 404."""
-    pass
+def test_dashboard_detail_404(client):
+    response = client.get(
+        "/incidents/00000000-0000-0000-0000-000000000000",
+        headers={"accept": "text/html"},
+    )
+    assert response.status_code == 404

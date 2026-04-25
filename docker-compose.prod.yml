@@ -1,0 +1,10 @@
+services:
+  app:
+    image: ${APP_IMAGE:?Set APP_IMAGE to a prebuilt image}
+    restart: unless-stopped
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    image: ${APP_IMAGE:?Set APP_IMAGE to a prebuilt image}
+    restart: unless-stopped
+    command: uv run celery -A worker.celery_app worker --loglevel=info --concurrency=2

@@ -37,8 +37,9 @@ def _wants_html(request: Request) -> bool:
 async def http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code == 404 and _wants_html(request):
         return templates.TemplateResponse(
-            "error_404.html",
-            {"request": request, "detail": exc.detail},
+            request=request,
+            name="error_404.html",
+            context={"request": request, "detail": exc.detail},
             status_code=404,
         )
     error_code = "not_found" if exc.status_code == 404 else "internal_error"
@@ -52,8 +53,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def unhandled_exception_handler(request: Request, exc: Exception):
     if _wants_html(request):
         return templates.TemplateResponse(
-            "error_500.html",
-            {"request": request, "detail": str(exc)},
+            request=request,
+            name="error_500.html",
+            context={"request": request, "detail": str(exc)},
             status_code=500,
         )
     return JSONResponse(
