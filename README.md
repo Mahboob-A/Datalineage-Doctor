@@ -5,7 +5,7 @@
 ## What It Does
 DataLineage Doctor is an AI incident responder for OpenMetadata. When a `testCaseFailed` webhook arrives, it launches an RCA agent that gathers lineage, data quality history, pipeline status, ownership, and local incident history, then produces a structured report with timeline, blast radius, confidence, and remediation steps.
 
-## Demo
+## Incident Detail 
 ![DataLineage Doctor dashboard overview](docs/demo-sprint4-overview.svg)
 
 ## Quick Start
