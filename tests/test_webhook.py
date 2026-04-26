@@ -41,5 +41,5 @@ def test_webhook_missing_entity(client):
 
 
 def test_webhook_wrong_content_type(client):
-    response = client.post("/webhook/openmetadata", data="x")
+    response = client.post("/webhook/openmetadata", content="x")
     assert response.status_code in {400, 415, 422}

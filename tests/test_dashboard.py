@@ -1,8 +1,16 @@
 """Dashboard route rendering tests (with mocked DB access)."""
 
 
-def test_dashboard_list_renders(client):
+def test_landing_page_renders(client):
     response = client.get("/", headers={"accept": "text/html"})
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "DataLineage Doctor" in response.text
+    assert "Go to Dashboard" in response.text
+
+
+def test_dashboard_list_renders(client):
+    response = client.get("/incidents", headers={"accept": "text/html"})
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "mysql.default.raw_orders" in response.text

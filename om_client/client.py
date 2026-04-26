@@ -80,7 +80,8 @@ async def _get_token() -> str:
     global _cached_token
 
     # 1. Static bot token from .env — never expires, always preferred
-    if settings.om_jwt_token:
+    # Use if truthy (handles missing or empty string)
+    if settings.om_jwt_token and settings.om_jwt_token.strip():
         return settings.om_jwt_token
 
     # 2. Already have a cached runtime token
