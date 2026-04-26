@@ -45,6 +45,21 @@ prod:
 prod-down:
 	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
+prod-mini-restart:
+	@echo "==> Restarting production app and worker..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml restart app worker
+	@echo "✅ Production app and worker restarted."
+
+prod-nginx-restart:
+	@echo "==> Restarting production nginx..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml restart nginx
+	@echo "✅ Production nginx restarted."
+
+prod-full-restart:
+	@echo "==> Restarting production full stack..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+	@echo "✅ Production full stack restarted."
+
 prod-logs:
 	docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f app worker nginx
 
