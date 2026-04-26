@@ -18,7 +18,8 @@ from worker.persistence import save_incident, set_om_incident_id, set_slack_noti
 
 try:
     # Expose worker-local Prometheus registry for app-side metrics aggregation.
-    start_http_server(9101)
+    # Bind to 0.0.0.0 to ensure cross-container reachability.
+    start_http_server(9101, addr="0.0.0.0")
 except OSError:
     # Celery can import this module more than once; ignore duplicate binds.
     pass

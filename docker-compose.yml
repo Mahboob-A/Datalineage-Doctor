@@ -16,9 +16,14 @@ services:
 
   worker:
     image: ${APP_IMAGE:-datalineage-doctor:dev}
-    command: uv run celery -A worker.celery_app worker --loglevel=info --pool=solo
+    # --pool=threads: tasks run in threads within the same process, so the
+    # Prometheus HTTP server (port 9101) and all metric counters share memory.
+    # --concurrency=4: good fit for 6-vCPU / 16 GB RAM with I/O-bound RCA tasks.
+    command: uv run celery -A worker.celery_app worker --loglevel=info --pool=threads --concurrency=4
     env_file:
       - .env
+    expose:
+      - "9101"
     depends_on:
       db:
         condition: service_healthy
@@ -144,10 +149,14 @@ services:
     image: prom/prometheus:v2.54.1
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.external-url=https://prometheus.dldoctor.app"
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     depends_on:
       app:
         condition: service_started
@@ -160,6 +169,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Grafana is now at the root of its own subdomain — no subpath needed.
+      GF_SERVER_ROOT_URL: https://grafana.dldoctor.app
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -171,3 +182,4 @@ volumes:
   mysql_data:
   es_data:
   postgres_data:
+  prometheus_data:

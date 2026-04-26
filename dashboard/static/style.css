@@ -1062,3 +1062,140 @@ tbody tr:hover {
   .hero-headline { font-size: 1.7rem; }
   .cta-btn { width: 100%; justify-content: center; }
 }
+
+/* ============================================================
+   INFO NOTEPAD (Sticky Note Style)
+   ============================================================ */
+.notepad-container {
+  position: relative;
+}
+
+.notepad {
+  display: none;
+  position: absolute;
+  top: calc(100% + 1.25rem);
+  right: -0.5rem;
+  width: 290px;
+  /* Parchment / Post-it yellow — distinct from the abyss theme but harmonious */
+  background: #fffbe6;
+  color: #2c3e50;
+  padding: 1.5rem;
+  border-radius: 4px;
+  box-shadow:
+    0 10px 35px rgba(0, 0, 0, 0.6),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  font-family: "IBM Plex Sans", sans-serif;
+  z-index: 1000;
+  transform-origin: top right;
+  animation: notepad-reveal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes notepad-reveal {
+  from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* The "paper" lines */
+.notepad::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 23px,
+    rgba(0, 0, 0, 0.04) 23px,
+    rgba(0, 0, 0, 0.04) 24px
+  );
+  pointer-events: none;
+}
+
+/* The sticky note fold effect */
+.notepad::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 20px 20px;
+  border-color: transparent transparent rgba(0, 0, 0, 0.1) transparent;
+}
+
+.notepad.active {
+  display: block;
+}
+
+.notepad h4 {
+  color: #8b4513; /* SaddleBrown */
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 0 0 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid rgba(139, 69, 19, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.notepad h4::before {
+  content: "🗒️";
+  font-size: 1rem;
+}
+
+.notepad ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notepad li {
+  margin-bottom: 0.85rem;
+  line-height: 1.4;
+  position: relative;
+}
+
+.notepad .note-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #a08060;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+
+.notepad a {
+  color: #1565c0;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: color 0.15s ease;
+  word-break: break-all;
+}
+
+.notepad a:hover {
+  color: #0d47a1;
+  text-decoration: underline;
+}
+
+.nav-btn-info {
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nav-btn-info:hover .info-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.info-icon {
+  transition: transform 0.2s ease;
+}

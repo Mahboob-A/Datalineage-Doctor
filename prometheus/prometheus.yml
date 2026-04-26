@@ -1,8 +1,17 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
+  # FastAPI app — HTTP request counts, general Python metrics
   - job_name: datalineage-doctor-app
     metrics_path: /metrics
     static_configs:
       - targets: ["app:8000"]
+
+  # Celery worker — all RCA counters (rca_requests_total, rca_duration_seconds, etc.)
+  # Scraped directly so metrics are always accurate, regardless of task load.
+  - job_name: datalineage-doctor-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9101"]

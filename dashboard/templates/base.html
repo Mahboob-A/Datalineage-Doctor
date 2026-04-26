@@ -1,157 +1,204 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DataLineage Doctor</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/style.css" />
-    <link rel="icon" type="image/x-icon" href="/static/icon/favicon.ico" />
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DataLineage Doctor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/x-icon" href="/static/icon/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icon/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/static/icon/favicon-16x16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icon/apple-touch-icon.png" />
   <link rel="manifest" href="/static/icon/site.webmanifest" />
-  </head>
-  <body>
-    <header class="header">
-      <div class="container">
-        <a href="/" class="brand" style="text-decoration:none;">
-      {# Old logo kept for reference
-      <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
-        <rect x="3" y="8" width="42" height="32" rx="10" />
-        <path d="M14 28c4-8 9-12 15-12" />
-        <path d="M20 31c3-5 6-8 10-8" />
-        <circle cx="31" cy="18" r="3" />
-      </svg>
-      #}
-      {#
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="DataLineage Doctor logo">
-        <rect x="4" y="8" width="40" height="32" rx="9" fill="none" stroke="#0EA5E9" stroke-width="3"/>
-        <path d="M12 30 C17 22, 24 18, 34 18" fill="none" stroke="#0EA5E9" stroke-width="3" stroke-linecap="round"/>
-        <path d="M18 33 C21 28, 25 25, 30 25" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="34" cy="18" r="3" fill="#22C55E"/>
-      </svg>
-      #}
-            <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Metadata lineage style logo">
-        <defs>
-          <linearGradient id="omLikeGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#13B5EA"/>
-            <stop offset="100%" stop-color="#2D6CDF"/>
-          </linearGradient>
-          <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="1.4" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        <circle cx="32" cy="32" r="27" fill="none" stroke="url(#omLikeGrad)" stroke-width="3"/>
-        <g stroke="url(#omLikeGrad)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#softGlow)">
-          <path d="M18 20 L32 14 L46 20"/>
-          <path d="M18 44 L32 50 L46 44"/>
-          <path d="M18 20 L18 44"/>
-          <path d="M46 20 L46 44"/>
-          <path d="M32 14 L32 50"/>
-          <path d="M18 32 L46 32"/>
-        </g>
+</head>
 
-        <g fill="#0B1220" stroke="url(#omLikeGrad)" stroke-width="2.4">
-          <circle cx="18" cy="20" r="4.2"/>
-          <circle cx="32" cy="14" r="4.2"/>
-          <circle cx="46" cy="20" r="4.2"/>
-          <circle cx="18" cy="44" r="4.2"/>
-          <circle cx="32" cy="50" r="4.2"/>
-          <circle cx="46" cy="44" r="4.2"/>
-          <circle cx="32" cy="32" r="5"/>
-        </g>
-      </svg>
-          <div>
-            <p class="brand-title">DataLineage Doctor</p>
-            <p class="brand-subtitle">RCA dashboard</p>
-          </div>
-        </a>
-        <nav class="nav">
-          <a href="/incidents">Dashboard</a>
-          <button id="trigger-incident-btn" class="nav-btn" type="button" aria-label="Trigger Incident">
-            Trigger Incident
+<body>
+  <header class="header">
+    <div class="container">
+      <a href="/" class="brand" style="text-decoration:none;">
+        {# Old logo kept for reference
+        <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
+          <rect x="3" y="8" width="42" height="32" rx="10" />
+          <path d="M14 28c4-8 9-12 15-12" />
+          <path d="M20 31c3-5 6-8 10-8" />
+          <circle cx="31" cy="18" r="3" />
+        </svg>
+        #}
+        {#
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="DataLineage Doctor logo">
+          <rect x="4" y="8" width="40" height="32" rx="9" fill="none" stroke="#0EA5E9" stroke-width="3" />
+          <path d="M12 30 C17 22, 24 18, 34 18" fill="none" stroke="#0EA5E9" stroke-width="3" stroke-linecap="round" />
+          <path d="M18 33 C21 28, 25 25, 30 25" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" />
+          <circle cx="34" cy="18" r="3" fill="#22C55E" />
+        </svg>
+        #}
+        <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img"
+          aria-label="Metadata lineage style logo">
+          <defs>
+            <linearGradient id="omLikeGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#13B5EA" />
+              <stop offset="100%" stop-color="#2D6CDF" />
+            </linearGradient>
+            <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <circle cx="32" cy="32" r="27" fill="none" stroke="url(#omLikeGrad)" stroke-width="3" />
+          <g stroke="url(#omLikeGrad)" stroke-width="3" stroke-linecap="round" fill="none" filter="url(#softGlow)">
+            <path d="M18 20 L32 14 L46 20" />
+            <path d="M18 44 L32 50 L46 44" />
+            <path d="M18 20 L18 44" />
+            <path d="M46 20 L46 44" />
+            <path d="M32 14 L32 50" />
+            <path d="M18 32 L46 32" />
+          </g>
+
+          <g fill="#0B1220" stroke="url(#omLikeGrad)" stroke-width="2.4">
+            <circle cx="18" cy="20" r="4.2" />
+            <circle cx="32" cy="14" r="4.2" />
+            <circle cx="46" cy="20" r="4.2" />
+            <circle cx="18" cy="44" r="4.2" />
+            <circle cx="32" cy="50" r="4.2" />
+            <circle cx="46" cy="44" r="4.2" />
+            <circle cx="32" cy="32" r="5" />
+          </g>
+        </svg>
+        <div>
+          <p class="brand-title">DataLineage Doctor</p>
+          <p class="brand-subtitle">RCA dashboard</p>
+        </div>
+      </a>
+      <nav class="nav">
+        <a href="/incidents">Dashboard</a>
+        <div class="notepad-container">
+          <button id="info-notepad-btn" class="nav-btn nav-btn-info" type="button" aria-label="Show Links">
+            <span class="info-icon"></span> Info
           </button>
-          <a href="https://github.com/mahboob-a/Datalineage-Doctor/" target="_blank" rel="noreferrer">GitHub</a>
-        </nav>
-      </div>
-    </header>
-    <main class="container">{% block content %}{% endblock %}</main>
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const triggerBtn = document.getElementById("trigger-incident-btn");
-        let pollInterval = null;
+          <div id="info-notepad" class="notepad">
+            <h4>Quick Links</h4>
+            <ul>
+              <li>
+                <span class="note-label">docs</span>
+                <a href="/docs" target="_blank">dldoctor.app/docs</a>
+              </li>
+              <li>
+                <span class="note-label">openmetadata</span>
+                <a href="https://om.dldoctor.app" target="_blank">om.dldoctor.app</a>
+              </li>
+              <li>
+                <span class="note-label">grafana</span>
+                <a href="https://grafana.dldoctor.app" target="_blank">grafana.dldoctor.app</a>
+              </li>
+              <li>
+                <span class="note-label">prometheus</span>
+                <a href="https://prometheus.dldoctor.app" target="_blank">prometheus.dldoctor.app</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <button id="trigger-incident-btn" class="nav-btn" type="button" aria-label="Trigger Incident">
+          Trigger Incident
+        </button>
+        <a href="https://github.com/mahboob-a/Datalineage-Doctor/" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">{% block content %}{% endblock %}</main>
+  <script>
+    // Toggle Info Notepad
+    const infoBtn = document.getElementById('info-notepad-btn');
+    const notepad = document.getElementById('info-notepad');
 
-        const startPolling = () => {
-          if (pollInterval) return;
-          pollInterval = setInterval(async () => {
-            try {
-              const res = await fetch("/api/incidents/latest");
-              if (res.ok) {
-                const data = await res.json();
-                if (data.status === "COMPLETE" || data.status === "FAILED") {
-                  clearInterval(pollInterval);
-                  window.location.reload();
-                }
-              }
-            } catch (err) {
-              console.error("Polling error:", err);
-            }
-          }, 3000);
-        };
+    if (infoBtn && notepad) {
+      infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notepad.classList.toggle('active');
+      });
 
-        const checkInitialStatus = async () => {
+      document.addEventListener('click', (e) => {
+        if (!notepad.contains(e.target) && e.target !== infoBtn) {
+          notepad.classList.remove('active');
+        }
+      });
+    }
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const triggerBtn = document.getElementById("trigger-incident-btn");
+      let pollInterval = null;
+
+      const startPolling = () => {
+        if (pollInterval) return;
+        pollInterval = setInterval(async () => {
           try {
             const res = await fetch("/api/incidents/latest");
             if (res.ok) {
               const data = await res.json();
-              if (data.status === "PROCESSING") {
-                if (triggerBtn) {
-                  triggerBtn.disabled = true;
-                  triggerBtn.textContent = "Processing...";
-                }
-                startPolling();
+              if (data.status === "COMPLETE" || data.status === "FAILED") {
+                clearInterval(pollInterval);
+                window.location.reload();
               }
             }
           } catch (err) {
-            console.error("Failed to check status:", err);
+            console.error("Polling error:", err);
           }
-        };
+        }, 3000);
+      };
 
-        if (triggerBtn) {
-          checkInitialStatus();
-
-          triggerBtn.addEventListener("click", async () => {
-            triggerBtn.disabled = true;
-            triggerBtn.textContent = "Processing...";
-            try {
-              const res = await fetch("/api/demo/trigger", { method: "POST" });
-              if (res.ok) {
-                startPolling();
-              } else {
-                const data = await res.json();
-                alert("Failed to trigger incident: " + (data.detail || res.statusText));
-                triggerBtn.disabled = false;
-                triggerBtn.textContent = "Trigger Incident";
+      const checkInitialStatus = async () => {
+        try {
+          const res = await fetch("/api/incidents/latest");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === "PROCESSING") {
+              if (triggerBtn) {
+                triggerBtn.disabled = true;
+                triggerBtn.textContent = "Processing...";
               }
-            } catch (err) {
-              console.error(err);
-              alert("Error triggering incident. Check console.");
+              startPolling();
+            }
+          }
+        } catch (err) {
+          console.error("Failed to check status:", err);
+        }
+      };
+
+      if (triggerBtn) {
+        checkInitialStatus();
+
+        triggerBtn.addEventListener("click", async () => {
+          triggerBtn.disabled = true;
+          triggerBtn.textContent = "Processing...";
+          try {
+            const res = await fetch("/api/demo/trigger", { method: "POST" });
+            if (res.ok) {
+              startPolling();
+            } else {
+              const data = await res.json();
+              alert("Failed to trigger incident: " + (data.detail || res.statusText));
               triggerBtn.disabled = false;
               triggerBtn.textContent = "Trigger Incident";
             }
-          });
-        }
-      });
-    </script>
-  </body>
+          } catch (err) {
+            console.error(err);
+            alert("Error triggering incident. Check console.");
+            triggerBtn.disabled = false;
+            triggerBtn.textContent = "Trigger Incident";
+          }
+        });
+      }
+    });
+  </script>
+</body>
+
 </html>
