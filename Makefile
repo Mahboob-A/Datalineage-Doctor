@@ -1,4 +1,4 @@
-.PHONY: dev stop clean migrate migrate-om test lint demo logs shell
+.PHONY: dev stop clean migrate migrate-om test lint demo logs shell certbot-init certbot-renew certbot-expand
 
 dev:
 	docker compose up -d --build
@@ -89,3 +89,21 @@ certbot-renew:
 	  certbot/certbot renew --standalone --quiet
 	docker compose -f docker-compose.yml -f docker-compose.prod.yml start nginx
 	@echo "==> Certificate renewed and nginx reloaded."
+
+certbot-expand:
+	@echo "==> Expanding SSL certificate to include subdomains..."
+	@echo "==> Nginx must NOT be running. Port 80 must be free."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml stop nginx
+	docker run --rm \
+	  -p 80:80 \
+	  -v /home/dldoctor/certs:/etc/letsencrypt \
+	  certbot/certbot certonly --standalone \
+	  --expand \
+	  -d dldoctor.app \
+	  -d om.dldoctor.app \
+	  -d grafana.dldoctor.app \
+	  -d prometheus.dldoctor.app \
+	  --non-interactive --agree-tos -m admin@dldoctor.app \
+	  --no-eff-email
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml start nginx
+	@echo "==> Certificate expanded. Nginx restarted."
