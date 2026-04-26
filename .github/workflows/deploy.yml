@@ -1,0 +1,66 @@
+name: Deploy to Linode
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ── Job 1: Run test suite ────────────────────────────────────
+  test:
+    name: Run pytest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests
+        run: uv run pytest tests/ -q --tb=short
+
+  # ── Job 2: Deploy to Linode ──────────────────────────────────
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: SSH deploy to Linode
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LINODE_HOST }}
+          username: ${{ secrets.LINODE_USER }}
+          key: ${{ secrets.LINODE_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/dldoctor/app
+
+            echo "==> Pulling latest code..."
+            git pull origin main
+
+            echo "==> Building app + worker images..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build app worker
+
+            echo "==> Starting / updating all services..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+            echo "==> Running database migrations..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app uv run alembic upgrade head
+
+            echo "==> Running smoke test..."
+            sleep 5
+            curl -f https://dldoctor.app/health || { echo "Smoke test failed!"; exit 1; }
+
+            echo "==> Deploy complete ✅"

@@ -1,238 +1,286 @@
 # Deployment Guide
 
 **Project:** DataLineage Doctor
-**Version:** 1.0
-**Date:** April 17, 2026
+**Version:** 2.0 (Production — Linode)
+**Date:** April 26, 2026
 **Status:** Approved
 
 ---
 
-## Deployment Overview
+## Overview
 
-DataLineage Doctor runs entirely in Docker Compose for local development and demo. There is no cloud deployment target for MVP. The entire stack — FastAPI app, Celery worker, Redis, PostgreSQL, and the OpenMetadata platform — runs on a single developer machine.
+DataLineage Doctor runs as a full Docker Compose stack on a single Linode server (16 GB RAM, 6 CPU, 320 GB SSD, 10 GB swap) at **`https://dldoctor.app`**.
 
-Production deployment infrastructure (Kubernetes, Helm, cloud provider configuration) is explicitly out of scope for this project.
+Nginx acts as the TLS-terminating reverse proxy. All services run in a shared Docker network. Only ports 22, 80, and 443 are publicly accessible (UFW enforced).
+
+---
+
+## URL Routing
+
+| Public URL | Routes to |
+|---|---|
+| `https://dldoctor.app/` | Landing page (static, Bioluminescent Abyss theme) |
+| `https://dldoctor.app/incidents` | Incidents list dashboard |
+| `https://dldoctor.app/incidents/{id}` | Incident detail + lineage graph |
+| `https://dldoctor.app/docs` | FastAPI OpenAPI / Swagger UI |
+| `https://dldoctor.app/health` | Health check endpoint |
+| `https://dldoctor.app/metrics` | Prometheus metrics |
+| `https://dldoctor.app/grafana/` | Grafana dashboard |
+| `https://dldoctor.app/prometheus/` | Prometheus UI |
+| `https://dldoctor.app/openmetadata/` | OpenMetadata UI (judges access) |
+| `http://dldoctor.app/*` | 301 redirect → HTTPS |
 
 ---
 
 ## Docker Compose Stack
 
-The full stack is defined in `docker-compose.yml` at the project root.
-
 ### Services
 
-| Service | Image | Role | Internal Port |
-|---|---|---|---|
-| `app` | Built from `Dockerfile` | FastAPI HTTP server | 8000 |
-| `worker` | Built from `Dockerfile` | Celery RCA task worker | — |
-| `redis` | `redis:7-alpine` | Celery broker and result backend | 6379 |
-| `db` | `postgres:16-alpine` | Local persistence (incidents, reports) | 5432 |
-| `openmetadata_server` | `openmetadata/server` | OpenMetadata backend | 8585 |
-| `openmetadata_ingestion` | `openmetadata/ingestion` | OpenMetadata ingestion UI | 8080 |
-| `elasticsearch` | `elasticsearch:8.x` | OpenMetadata search backend | 9200 |
-| `mysql` | `mysql:8` | OpenMetadata metadata store | 3306 |
+| Service | Image | Role |
+|---|---|---|
+| `nginx` | `nginx:1.27-alpine` | TLS reverse proxy (ports 80, 443) |
+| `app` | Built from `docker/Dockerfile` | FastAPI HTTP server |
+| `worker` | Built from `docker/Dockerfile` | Celery RCA task worker |
+| `redis` | `redis:7-alpine` | Celery broker + result backend |
+| `db` | `postgres:16-alpine` | Local incidents DB |
+| `mysql` | `mysql:8` | OpenMetadata metadata store |
+| `elasticsearch` | `elasticsearch:8.15.0` | OpenMetadata search backend |
+| `openmetadata_server` | `openmetadata/server:1.5.4` | OpenMetadata platform |
+| `prometheus` | `prom/prometheus:v2.54.1` | Metrics scraper |
+| `grafana` | `grafana/grafana:11.2.2` | Observability dashboard |
 
-The OpenMetadata stack (last four services) uses the official OpenMetadata Docker Compose configuration as a base. It is included or referenced via `docker-compose.override.yml`.
+### Compose file strategy
+
+```bash
+# Production (always both files):
+docker compose -f docker-compose.yml -f docker-compose.prod.yml <command>
+
+# Local development (base + override):
+docker compose up -d   # docker-compose.override.yml is picked up automatically
+```
 
 ---
 
-## Local Development Setup
+## Server Details
 
-### Prerequisites
+| Property | Value |
+|---|---|
+| IP | `172.236.169.146` |
+| Domain | `dldoctor.app` |
+| OS | Ubuntu (Linode) |
+| RAM | 16 GB |
+| Swap | 10 GB (512M partition + 10G file) |
+| Storage | 320 GB SSD |
+| Deploy user | `dldoctor` (sudo + docker groups) |
+| App directory | `/home/dldoctor/app` |
 
-- Docker Desktop (Mac/Windows) or Docker Engine + Compose plugin (Linux)
-- Python 3.12 with `uv` installed
-- Git
-- At least 8 GB free RAM (OpenMetadata stack is memory-heavy)
+---
 
-### First-time setup
+## First-Time Server Setup
+
+### Step 1 — SSH into the server
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url>
-cd datalineage-doctor
+ssh dldoctor@172.236.169.146
+```
 
-# 2. Copy environment file and fill in values
+### Step 2 — Run the provisioning script
+
+```bash
+cd /home/dldoctor/app   # after cloning (script clones if not present)
+bash scripts/server_setup.sh
+```
+
+The script:
+- Configures UFW (allow 22, 80, 443; deny everything else)
+- Clones or pulls the repo
+- Creates `.env` from `.env.example`
+- Adds monthly certbot renewal cron
+
+### Step 3 — Edit `.env` with production secrets
+
+```bash
+nano /home/dldoctor/app/.env
+```
+
+Required changes from `.env.example`:
+
+```bash
+APP_ENV=production
+APP_BASE_URL=https://dldoctor.app
+
+LLM_API_KEY=<your Gemini key>
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+LLM_MODEL=gemini-2.5-flash-preview-04-17
+LLM_TIMEOUT_SECONDS=90
+
+OM_JWT_TOKEN=<your OM non-expiring bot token>
+# OR use credential fallback:
+# OM_ADMIN_EMAIL=admin@open-metadata.org
+# OM_ADMIN_PASSWORD=YWRtaW4=
+
+SLACK_ENABLED=false
+SLACK_WEBHOOK_URL=<optional>
+```
+
+### Step 4 — Obtain SSL certificate (first time only)
+
+Certbot needs port 80 accessible to verify the domain. Start all services **except nginx** first so certbot can use the webroot:
+
+```bash
+cd /home/dldoctor/app
+
+# Start everything except nginx
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
+  app worker db redis mysql elasticsearch execute-migrate-all openmetadata_server prometheus grafana
+
+# Obtain the certificate
+make certbot-init
+```
+
+### Step 5 — Start the full stack (including nginx)
+
+```bash
+make prod
+```
+
+### Step 6 — Run database migrations
+
+```bash
+make prod-migrate
+```
+
+### Step 7 — Verify
+
+```bash
+curl https://dldoctor.app/health
+# Expected: {"status": "ok"}
+```
+
+---
+
+## GitOps CI/CD
+
+Every push to `main` triggers the GitHub Actions workflow at `.github/workflows/deploy.yml`.
+
+### Flow
+
+```
+Push to main
+    │
+    ▼
+Job: test
+  - Install uv + dependencies
+  - Run pytest (all 60+ tests must pass)
+    │
+    ▼ (on success)
+Job: deploy
+  - SSH into 172.236.169.146 as dldoctor
+  - git pull origin main
+  - docker compose build app worker
+  - docker compose up -d
+  - alembic upgrade head
+  - curl https://dldoctor.app/health (smoke test)
+```
+
+### GitHub Secrets Setup
+
+Go to: `https://github.com/Mahboob-A/Datalineage-Doctor/settings/secrets/actions`
+
+Add three repository secrets:
+
+| Secret name | Value |
+|---|---|
+| `LINODE_HOST` | `172.236.169.146` |
+| `LINODE_USER` | `dldoctor` |
+| `LINODE_SSH_KEY` | Contents of your `~/.ssh/dldoctor_deploy` private key file |
+
+**Generate the SSH key pair** (run once on your Mac):
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/dldoctor_deploy
+# No passphrase
+
+# Copy the PUBLIC key to the Linode server:
+ssh-copy-id -i ~/.ssh/dldoctor_deploy.pub dldoctor@172.236.169.146
+
+# Copy the PRIVATE key content for GitHub:
+cat ~/.ssh/dldoctor_deploy   # paste this entire output into LINODE_SSH_KEY secret
+```
+
+---
+
+## Production Makefile Commands
+
+```bash
+make prod             # Build + start full prod stack (with Nginx)
+make prod-down        # Stop prod stack
+make prod-logs        # Tail app, worker, nginx logs
+make prod-migrate     # Run Alembic migrations in prod
+make certbot-init     # Obtain SSL certificate (first time only)
+make certbot-renew    # Renew SSL certificate + reload nginx
+```
+
+---
+
+## Local Development Setup (unchanged)
+
+```bash
+# Prerequisites: Docker Desktop, Python 3.12, uv
+git clone https://github.com/Mahboob-A/Datalineage-Doctor.git
+cd Datalineage-Doctor
 cp .env.example .env
-# Edit .env — minimum required: LLM_API_KEY, LLM_MODEL, SLACK_WEBHOOK_URL
-
-# 3. Start the full stack
+# Edit .env (LLM_API_KEY minimum)
 make dev
-
-# 4. Wait for OpenMetadata to be healthy (takes ~2-3 minutes on first start)
-# Check: http://localhost:8585 should show the OM login page
-
-# 5. Run database migrations
 make migrate
-
-# 6. Verify the app is running
 curl http://localhost:8000/health
 ```
 
----
-
-## Environment Configuration
-
-All environment variables are documented in `.env.example`. Copy it to `.env` for local use. `.env` is gitignored.
-
-### Required variables
-
-```bash
-# LLM Configuration
-LLM_API_KEY=your-api-key-here
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-LLM_MODEL=gemini-2.0-flash
-LLM_TIMEOUT_SECONDS=90
-LLM_MAX_ITERATIONS=15
-
-# PostgreSQL
-DATABASE_URL=postgresql+psycopg://dld:dld@db:5432/datalineage_doctor
-
-# Redis / Celery
-REDIS_URL=redis://redis:6379/0
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/1
-
-# OpenMetadata
-OM_BASE_URL=http://openmetadata_server:8585/api
-OM_JWT_TOKEN=your-om-jwt-token-here
-
-# Notifications
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
-SLACK_ENABLED=true
-
-# App
-APP_ENV=development
-APP_PORT=8000
-LOG_LEVEL=INFO
-APP_BASE_URL=http://localhost:8000
-```
-
-### Switching LLM providers
-
-To switch from Gemini to another OpenAI-compatible provider, update three variables only:
-
-```bash
-# DeepSeek
-LLM_API_KEY=your-deepseek-key
-LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_MODEL=deepseek-chat
-
-# Kimi (Moonshot)
-LLM_API_KEY=your-moonshot-key
-LLM_BASE_URL=https://api.moonshot.cn/v1
-LLM_MODEL=moonshot-v1-8k
-
-# GLM (Zhipu)
-LLM_API_KEY=your-zhipu-key
-LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-LLM_MODEL=glm-4
-```
-
-No code changes are required when switching providers.
+Local endpoints: `http://localhost:8000` (app), `http://localhost:8585` (OM), `http://localhost:3000` (Grafana), `http://localhost:9090` (Prometheus).
 
 ---
 
-## Makefile Commands
+## Environment Variables
 
-```makefile
-make dev         # Start full Docker Compose stack
-make stop        # Stop all containers
-make clean       # Stop and remove all volumes (full reset)
-make migrate     # Run Alembic migrations
-make test        # Run pytest suite
-make lint        # Run ruff check and format check
-make demo        # Seed OM data, trigger a failure, open dashboard
-make logs        # Tail app and worker logs
-make shell       # Open a shell in the app container
-```
+All variables documented in `.env.example`. Key production-only additions:
+
+| Variable | Production value |
+|---|---|
+| `APP_ENV` | `production` |
+| `APP_BASE_URL` | `https://dldoctor.app` |
+| `GF_SERVER_ROOT_URL` | `https://dldoctor.app/grafana` (set in `docker-compose.prod.yml`) |
+| `GF_SERVER_SERVE_FROM_SUB_PATH` | `true` (set in `docker-compose.prod.yml`) |
 
 ---
 
-## Running the Demo
+## SSL Certificate Renewal
 
-From a cold start with the stack already running:
+Let's Encrypt certs expire every 90 days. Renewal is automated via monthly cron:
 
-```bash
-# Step 1: Seed demo entities into OpenMetadata
-uv run python scripts/seed_demo.py
-
-# Step 2: Trigger a DQ test failure (fires the webhook)
-uv run python scripts/trigger_demo.py
-
-# Step 3: Watch the RCA agent process the incident
-make logs
-
-# Step 4: Open the dashboard
-open http://localhost:8000
+```
+0 3 1 * *  cd /home/dldoctor/app && make certbot-renew
 ```
 
-Or run all steps at once:
-
+To renew manually:
 ```bash
-make demo
-```
-
-Within approximately 3 minutes, an incident appears in the dashboard at `http://localhost:8000` with a lineage graph, timeline, blast radius table, and Slack notification.
-
----
-
-## Database Migrations
-
-Alembic manages all schema changes. Migrations run automatically in `make dev` via an init container, or manually:
-
-```bash
-# Apply all pending migrations
-make migrate
-
-# Generate a new migration after model changes
-docker compose exec app uv run alembic revision --autogenerate -m "description"
+make certbot-renew
 ```
 
 ---
 
 ## Health Checks
 
-| Endpoint | Expected response |
+| Endpoint | Expected |
 |---|---|
-| `GET http://localhost:8000/health` | `{"status": "ok"}` |
-| `GET http://localhost:8000/metrics` | Prometheus text format |
-| `GET http://localhost:8585` | OpenMetadata login page |
-
----
-
-## Resetting Demo State
-
-To run the demo from a fully clean state:
-
-```bash
-make clean        # Removes all Docker volumes
-make dev          # Starts fresh stack
-make migrate      # Re-applies database schema
-make demo         # Re-seeds and triggers
-```
-
----
-
-## Pre-deployment Checklist
-
-Before demo or submission:
-
-- [ ] `.env` is populated with valid API keys
-- [ ] `make dev` starts all containers without errors
-- [ ] `http://localhost:8585` shows the OpenMetadata UI
-- [ ] `curl http://localhost:8000/health` returns `{"status": "ok"}`
-- [ ] `make migrate` exits with code 0
-- [ ] `make test` exits with code 0 (≥ 50 tests passing)
-- [ ] `make demo` completes and an incident is visible in the dashboard
-- [ ] Slack notification is received (if `SLACK_ENABLED=true`)
-- [ ] `/metrics` shows all six required metrics after one demo run
+| `GET https://dldoctor.app/health` | `{"status": "ok"}` |
+| `GET https://dldoctor.app/metrics` | Prometheus text format |
+| `GET https://dldoctor.app/docs` | FastAPI Swagger UI |
 
 ---
 
 ## Known Constraints
 
-- The OpenMetadata stack takes 2–3 minutes to become healthy on first start due to Elasticsearch and MySQL initialisation
-- Demo requires at least 8 GB RAM; 16 GB recommended when running the full OM stack alongside the app
-- `LLM_TIMEOUT_SECONDS` should be set to at least 90 for providers with higher latency (GLM, Kimi on free tier)
-- The seed script is idempotent but requires OpenMetadata to be fully healthy before running
+- The OpenMetadata stack (Elasticsearch + MySQL + OM server) takes 2–3 minutes to become healthy on first start
+- Minimum 8 GB RAM required; this server has 16 GB + 10 GB swap — fully sufficient
+- OM served via Nginx subpath (`/openmetadata/`) may have some static asset issues due to OM's SPA routing; direct server access via SSH tunnel remains an option if needed
+- `make certbot-init` must be run before the first `make prod` (nginx won't start without the cert files)
