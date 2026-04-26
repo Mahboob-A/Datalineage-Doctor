@@ -15,20 +15,43 @@ Prerequisites:
 - OpenMetadata token configured in `.env` (`OM_JWT_TOKEN`)
 - LLM credentials configured in `.env` (`LLM_API_KEY`)
 
+After cloning:
+```bash
+git clone https://github.com/Mahboob-A/Datalineage-Doctor.git
+cd Datalineage-Doctor
+```
+
+## Development
 Run locally:
 ```bash
-git clone <your-repo-url>
-cd openmetadata/code
 make dev
 make migrate
 make demo
 ```
+- `make dev`: Starts the full Docker Compose stack for local development (App, Worker, DB, Redis, OpenMetadata, Prometheus, Grafana).
+- `make migrate`: Applies Alembic database migrations to the local PostgreSQL database.
+- `make demo`: Seeds demo data and triggers a simulated test case failure webhook for testing.
 
 Open:
-- App dashboard: `http://localhost:8000`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (`admin` / `admin`)
-- OpenMetadata: `http://localhost:8585`
+- App dashboard: `http://localhost:8000` (View incidents and lineage graphs)
+- Prometheus: `http://localhost:9090` (Metrics collection)
+- Grafana: `http://localhost:3000` (View RCA performance and observability dashboards. Demo Password: `admin` / `admin`)
+- OpenMetadata: `http://localhost:8585` (Metadata catalog and platform. Demo Password: `admin@open-metadata.org` / `admin`)
+
+## Production
+Production runs on a subdomain architecture behind Nginx.
+
+Production commands:
+- `make prod`: Builds and starts the production stack using `docker-compose.prod.yml`.
+- `make prod-down`: Stops and removes the production stack.
+- `make prod-migrate`: Runs Alembic database migrations in the production environment.
+- `make prod-logs`: Tails logs for the app, worker, and nginx containers.
+
+Open:
+- App dashboard: `https://dldoctor.app` (Production dashboard)
+- Prometheus: `https://prometheus.dldoctor.app` (Production metrics)
+- Grafana: `https://grafana.dldoctor.app` (Production observability. Demo Password: `admin` / `admin`)
+- OpenMetadata: `https://om.dldoctor.app` (Production catalog. Demo Password: `admin@open-metadata.org` / `admin`)
 
 ## Architecture
 ```mermaid
@@ -86,17 +109,13 @@ The service exports six core Prometheus metrics and a pre-provisioned Grafana da
 | Runtime | Docker Compose |
 
 ## OpenMetadata Integration
-APIs used:
-- Lineage API (upstream/downstream traversal)
-- Data Quality test result APIs
-- Pipeline status APIs
-- Ownership APIs
-- Incident API (when available on the running OM version)
+DataLineage Doctor intelligently leverages the OpenMetadata stack to transform an ordinary metadata catalog into an active, self-healing data governance nervous system. By tapping directly into OpenMetadata's core architecture, we've built a robust, context-aware AI agent that reasons over your entire data estate:
 
-## Hackathon Tracks
-- T-01: AI-powered metadata operations with tool-calling RCA agent
-- T-02: Observability via Prometheus instrumentation + Grafana dashboard
-- T-06: Governance and reliability through ownership-aware incident response
+- **Webhook-Driven Event Architecture**: We listen asynchronously for OpenMetadata's `testCaseFailed` webhooks, allowing instant, real-time incident response without polling overhead.
+- **Deep Lineage Traversal**: We dynamically query the Lineage API to perform graph-based upstream and downstream traversal. This enables the agent to instantly pinpoint root causes (upstream) and calculate precise blast radiuses (downstream).
+- **Quality & Pipeline Context**: By intersecting Data Quality API test results and Pipeline Status APIs, the AI triangulates whether a failure is due to bad data, delayed ETL pipelines, or structural schema changes.
+- **Ownership-Aware Routing**: The agent automatically pulls entity ownership data to contextualize the incident and route remediations to the correct data stewards, eliminating manual triage.
+- **Native Incident Creation**: When an RCA concludes, we feed the structured findings right back into OpenMetadata using its native Incident API, closing the loop directly where data engineers already work.
 
 ## Future Work
 - Webhook signature verification (HMAC)
