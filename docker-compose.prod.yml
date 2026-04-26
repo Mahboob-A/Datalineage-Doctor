@@ -45,7 +45,7 @@ services:
       dockerfile: docker/Dockerfile
     image: datalineage-doctor:prod
     restart: unless-stopped
-    command: uv run celery -A worker.celery_app worker --loglevel=info --concurrency=2
+    command: uv run celery -A worker.celery_app worker --loglevel=info --pool=threads --concurrency=2
 
   # ── Backing services (prod policy overrides only) ────────────
   redis:

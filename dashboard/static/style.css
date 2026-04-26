@@ -1161,12 +1161,21 @@ tbody tr:hover {
 
 .notepad .note-label {
   display: block;
-  font-size: 0.65rem;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-variant: all-small-caps;
   letter-spacing: 0.05em;
   color: #a08060;
   font-weight: 700;
   margin-bottom: 0.1rem;
+}
+
+.notepad .note-pass {
+  display: block;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: #5d4037;
+  margin-top: 0.15rem;
+  opacity: 0.8;
 }
 
 .notepad a {
