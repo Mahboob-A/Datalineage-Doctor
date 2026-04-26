@@ -61,6 +61,6 @@ logs/
 Thumbs.db
 
 # Others
-knowledge/
-docker/docker-compose-official-mysql-compose-file.yml
-AGENTS.md
+# knowledge/
+# docker/docker-compose-official-mysql-compose-file.yml
+# AGENTS.md

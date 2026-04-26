@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var btn = document.getElementById("trigger-incident-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.title = "Triggering a new incident is only available from the dashboard.";
+    }
+  });
+</script>
+
+{# ── Hero ──────────────────────────────────────────────────── #}
+<section class="landing-hero">
+  <div class="landing-hero-text">
+    <p class="eyebrow">DataLineage Doctor</p>
+
+    <h1 class="hero-headline">
+      Your revenue dashboard shows&nbsp;$0.<br>
+      It is 9:00&nbsp;AM.<br>
+      The CEO is already asking&nbsp;why.
+    </h1>
+
+    <p class="hero-bridge">
+      Somewhere upstream, a pipeline silently dropped a column. A DQ test failed at
+      3&nbsp;AM. No one was paged. Three reports are now wrong, and your on-call
+      engineer is grepping through logs.
+    </p>
+
+    <p class="hero-solution">
+      <strong class="hero-brand-inline">DataLineage Doctor</strong> traces the blast
+      radius in seconds. Root cause. Owners notified. Remediation steps generated.
+      Automatically. So your data team fixes the right thing. Fast.
+    </p>
+
+    <a href="/incidents" class="cta-btn" id="go-to-dashboard-btn">
+      Go to Dashboard
+      <span class="cta-arrow" aria-hidden="true">→</span>
+    </a>
+  </div>
+
+  {# Decorative animated lineage graph visual #}
+  <div class="hero-visual" aria-hidden="true">
+    <div class="hg-wrap">
+      <div class="hg-node hg-failed">
+        <span class="hg-dot hg-dot-pink"></span>
+        orders_raw
+      </div>
+      <div class="hg-connector hg-connector-down"></div>
+      <div class="hg-node hg-mid">
+        <span class="hg-dot hg-dot-green"></span>
+        revenue_daily
+      </div>
+      <div class="hg-fork">
+        <div class="hg-fork-left">
+          <div class="hg-connector hg-connector-fork"></div>
+          <div class="hg-node hg-downstream">
+            <span class="hg-dot hg-dot-purple"></span>
+            ceo_dashboard
+          </div>
+        </div>
+        <div class="hg-fork-right">
+          <div class="hg-connector hg-connector-fork"></div>
+          <div class="hg-node hg-downstream">
+            <span class="hg-dot hg-dot-purple"></span>
+            finance_report
+          </div>
+        </div>
+      </div>
+      <div class="hg-legend">
+        <span><span class="hg-dot hg-dot-pink hg-dot-sm"></span> Root cause</span>
+        <span><span class="hg-dot hg-dot-purple hg-dot-sm"></span> Downstream impact</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Feature cards ─────────────────────────────────────────── #}
+<section class="landing-features">
+  <p class="features-eyebrow eyebrow">Why DataLineage Doctor</p>
+  <div class="features-grid">
+
+    <article class="panel feature-card">
+      <div class="feature-icon" aria-hidden="true">🔬</div>
+      <h3 class="feature-title">Instant Root Cause</h3>
+      <p class="feature-desc">
+        An LLM-powered agent traverses your full OpenMetadata lineage graph and
+        pinpoints the upstream failure source. Automatically. Without a runbook.
+        Without tickets.
+      </p>
+    </article>
+
+    <article class="panel feature-card">
+      <div class="feature-icon" aria-hidden="true">💥</div>
+      <h3 class="feature-title">Blast Radius Analysis</h3>
+      <p class="feature-desc">
+        Know exactly which dashboards, ML models, and downstream tables are broken
+        before your users notice, or before the CEO walks into the 9&nbsp;AM standup.
+      </p>
+    </article>
+
+    <article class="panel feature-card">
+      <div class="feature-icon" aria-hidden="true">⚡</div>
+      <h3 class="feature-title">Zero Manual Triage</h3>
+      <p class="feature-desc">
+        Connects to OpenMetadata webhooks. Fires the moment a DQ test fails. Your
+        data team gets a structured RCA report in dashboard and Slack channel, not just a Slack ping saying "data is
+        weird."
+      </p>
+    </article>
+
+  </div>
+</section>
+
+{# ── Footer ────────────────────────────────────────────────── #}
+<footer class="landing-footer" role="contentinfo">
+  <p>
+    Made with <span class="heart" aria-label="love">❤</span>
+    by <strong>Mahboob A</strong>
+  </p>
+</footer>
+
+{% endblock %}

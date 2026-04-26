@@ -52,12 +52,23 @@ templates.env.filters["render_inline_code"] = render_inline_code
 
 
 @router.get("/", response_class=HTMLResponse)
+async def landing(request: Request) -> HTMLResponse:
+    """Serve the static marketing landing page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html",
+        context={"request": request},
+    )
+
+
+@router.get("/incidents", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
+    """Serve the incidents list dashboard."""
     incidents = await list_incidents(db, page=page, page_size=page_size)
     return templates.TemplateResponse(
         request=request,

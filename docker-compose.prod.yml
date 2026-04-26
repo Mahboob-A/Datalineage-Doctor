@@ -1,10 +1,91 @@
+# Production overrides — applied on top of docker-compose.yml
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml exec app uv run alembic upgrade head
+#
+# Strategy: build-on-server (no Docker registry required).
+# Security: all service ports are blocked by UFW except 80 and 443.
+#           Nginx is the only publicly-accessible entrypoint.
+
 services:
-  app:
-    image: ${APP_IMAGE:?Set APP_IMAGE to a prebuilt image}
+
+  # ── Nginx reverse proxy ──────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
     restart: unless-stopped
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/dldoctor/certs:/etc/letsencrypt:ro
+      - /home/dldoctor/certbot-www:/var/www/certbot:ro
+    depends_on:
+      - app
+      - grafana
+      - prometheus
+      - openmetadata_server
+
+  # ── Application services ────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: datalineage-doctor:prod
+    restart: unless-stopped
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    environment:
+      APP_ENV: production
+      APP_BASE_URL: https://dldoctor.app
 
   worker:
-    image: ${APP_IMAGE:?Set APP_IMAGE to a prebuilt image}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: datalineage-doctor:prod
     restart: unless-stopped
     command: uv run celery -A worker.celery_app worker --loglevel=info --concurrency=2
+
+  # ── Backing services (prod policy overrides only) ────────────
+  redis:
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+
+  mysql:
+    restart: unless-stopped
+
+  elasticsearch:
+    restart: unless-stopped
+
+  execute-migrate-all:
+    restart: "no"
+
+  openmetadata_server:
+    restart: unless-stopped
+
+  # ── Observability — subpath-aware configs ───────────────────
+  prometheus:
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=https://dldoctor.app/prometheus"
+      - "--web.route-prefix=/prometheus"
+
+  grafana:
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: https://dldoctor.app/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  grafana_data:
