@@ -45,7 +45,7 @@ jobs:
           key: ${{ secrets.LINODE_SSH_KEY }}
           script: |
             set -e
-            cd /home/dldoctor/app
+            cd /home/dldoctor/app/Datalineage-Doctor
 
             echo "==> Pulling latest code..."
             git pull origin main

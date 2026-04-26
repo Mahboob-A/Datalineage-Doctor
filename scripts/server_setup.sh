@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/Mahboob-A/Datalineage-Doctor.git"
-APP_DIR="/home/dldoctor/app"
+APP_DIR="/home/dldoctor/app/Datalineage-Doctor"
 
 echo ""
 echo "============================================"
