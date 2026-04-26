@@ -56,11 +56,14 @@ jobs:
             echo "==> Starting / updating all services..."
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
+            echo "==> Restarting Nginx to clear stale DNS caches..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml restart nginx
+
             echo "==> Running database migrations..."
             docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T app uv run alembic upgrade head
 
             echo "==> Running smoke test..."
-            sleep 5
+            sleep 10
             curl -f https://dldoctor.app/health || { echo "Smoke test failed!"; exit 1; }
 
-            echo "==> Deploy complete ✅"
+            echo "==> Deploy complete"
